@@ -620,6 +620,7 @@ const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d
 const LIB_TO={'An ninh':['an ninh','an'],'CSKV':['cskv','canh sat khu vuc'],'CSTT':['cstt','canh sat trat tu'],'PCTP':['pctp','phong chong toi pham'],'Tổng hợp':['tong hop','th']};
 const libTo=t=>String(t.group||'').split(' · ')[0];
 const toClean=s=>norm(s||'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim().replace(/^to /,'');
+const toList=()=>[...new Set([...(Array.isArray(settings.toList)?settings.toList:[]),...users.map(u=>u.toCT||'')].filter(Boolean))];
 const toKey=to=>{const n=toClean(to);if(!n)return '';return Object.keys(LIB_TO).find(k=>LIB_TO[k].includes(n))||[...new Set(library.map(libTo))].find(k=>toClean(k)===n)||'';};
 const num=n=>Number(n).toLocaleString('vi-VN',{maximumFractionDigits:2});
 const fmt=s=>{if(!s)return '—';const [d,t]=s.split(' ');const [y,m,dd]=d.split('-');return `${dd}/${m}/${y}${t?' '+t:''}`};
@@ -692,7 +693,7 @@ function closeItem(){
     if(d.text||d.chiTieu||d.spDuKien){S.itemD[S.itemOpen]=d;toast('Đã lưu bản nháp.');}else delete S.itemD[S.itemOpen];}
   S.itemOpen=null;S.editing=null;}
 function closeUser(){
-  if(S.addUser&&$('#f-user')){const d={id:$('#nu-id').value.trim(),name:$('#nu-name').value.trim(),capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,to:$('#nu-to').value,cv:$('#nu-cv').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
+  if(S.addUser&&$('#f-user')){const d={id:$('#nu-id').value.trim(),name:$('#nu-name').value.trim(),capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
     if(d.id||d.name||d.ngaySinh){S.userDraft=d;toast('Đã lưu bản nháp tài khoản.');}}
   S.addUser=false;S.editUser=null;}
 function periodPicker(){const y=S.period.slice(0,4),years=[...new Set(periods.map(p=>p.id.slice(0,4)))];
@@ -1071,7 +1072,7 @@ function summary(){
 
     <section class="panel">
       <div class="toolbar"><h3 class="h3">Bảng điểm</h3><div class="spacer"></div>
-        ${tos.length>1?`<select id="th-to" aria-label="Lọc tổ"><option value="*">Tất cả tổ</option>${tos.map(t=>`<option ${S.thTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>`:''}</div>
+        ${tos.length>1?`<select id="th-to" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${tos.map(t=>`<option ${S.thTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>`:''}</div>
       <div class="tw"><table class="sumt"><thead><tr><th>Hạng</th><th>Cán bộ</th><th>Kết quả KPI</th><th class="n">Tổng điểm</th><th>Hệ thống đề xuất</th><th>Lý do đề xuất</th><th>Xếp loại chốt</th><th>Báo cáo tháng</th><th class="n">Đang chờ duyệt</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td class="rank ${r.rank===1?'top':''}">${r.rank}</td><td>${esc(r.x.name)}<div class="sub">${esc(r.x.to)} · ${esc(r.x.cv)}</div></td>
         <td>${r.c.n?`<b>${r.c.done}/${r.c.n}</b> hoàn thành`:'<span class="sub">Chưa có KPI</span>'}<div class="sub">${[r.c.vuot?`${r.c.vuot} vượt chỉ tiêu`:'',r.c.miss?`<span class="neg">${r.c.miss} không hoàn thành</span>`:'',r.c.cham?`<span class="neg">${r.c.cham} chậm tiến độ</span>`:'',r.c.ps?`${r.c.ps} phát sinh`:''].filter(Boolean).join(' · ')||(r.c.n?`Điểm 1 KPI: ${num(r.c.tb)}`:'')}</div></td>
@@ -1089,7 +1090,7 @@ function repFilters(){
   const sc=scope(),tos=[...new Set(sc.map(x=>x.to))],multi=sc.length>1;
   return `<section class="panel pad"><div class="row">
     <div class="field"><label for="rp-period">Tháng</label><select id="rp-period">${[...new Set(periods.map(p=>p.id.slice(0,4)))].reverse().map(y=>`<optgroup label="Năm ${y}">${periods.filter(p=>p.id.startsWith(y)).map(p=>`<option value="${p.id}" ${p.id===S.rep.period?'selected':''}>Tháng ${+p.id.slice(5)}/${y}${p.state==='closed'?' · đã chốt':''}</option>`).join('')}</optgroup>`).join('')}</select></div>
-    ${multi?`<div class="field"><label for="rp-to">Tổ</label><select id="rp-to"><option value="*">Tất cả</option>${tos.map(t=>`<option ${S.rep.to===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+    ${multi?`<div class="field"><label for="rp-to">Nhóm</label><select id="rp-to"><option value="*">Tất cả</option>${tos.map(t=>`<option ${S.rep.to===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
     <div class="field"><label for="rp-who">Cán bộ</label><select id="rp-who"><option value="*">Tất cả</option>${sc.filter(x=>S.rep.to==='*'||x.to===S.rep.to).map(x=>`<option value="${x.id}" ${S.rep.who===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`:''}
     <div class="row" style="flex:0 0 auto;gap:8px"><button class="btn pri" data-act="export" data-f="xlsx">Xuất Excel</button><button class="btn" data-act="export" data-f="docx">Xuất Word</button></div>
   </div></section>`;
@@ -1099,7 +1100,7 @@ function reportDau(){
   const its=items.filter(i=>ids.includes(i.owner)&&i.period===p&&i.src!=='ps').sort((a,b)=>a.owner.localeCompare(b.owner)||a.type.localeCompare(b.type));
   return `<div class="head"><h2>Tổng hợp đăng ký đầu tháng</h2><p>Chương trình công tác: số việc được giao và tự đăng ký của từng cán bộ trong ${pLabel(p)}.</p></div>
     ${repFilters()}
-    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng hợp theo cán bộ</h3></div><div class="tw"><table><thead><tr><th>Cán bộ</th><th>Tổ</th><th class="n">KPI được giao</th><th class="n">KPI tự đăng ký</th><th class="n">Tổng KPI</th><th class="n">Điểm TB</th><th class="n">OKR được giao</th><th class="n">OKR tự đăng ký</th></tr></thead><tbody>
+    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng hợp theo cán bộ</h3></div><div class="tw"><table><thead><tr><th>Cán bộ</th><th>Nhóm</th><th class="n">KPI được giao</th><th class="n">KPI tự đăng ký</th><th class="n">Tổng KPI</th><th class="n">Điểm TB</th><th class="n">OKR được giao</th><th class="n">OKR tự đăng ký</th></tr></thead><tbody>
       ${ppl.map(x=>{const c=calc(x.id,p),o=items.filter(i=>i.owner===x.id&&i.period===p&&i.type==='OKR');
         return `<tr><td>${esc(x.name)}</td><td>${esc(x.to)}</td><td class="n">${c.giao}</td><td class="n">${c.dk}</td><td class="n"><b>${c.n}</b></td><td class="n">${c.n?num(c.tb):'—'}</td><td class="n">${o.filter(i=>i.src==='giao').length}</td><td class="n">${o.filter(i=>i.src==='dk').length}</td></tr>`;}).join('')||'<tr><td colspan="8" class="empty">Không có dữ liệu.</td></tr>'}
     </tbody></table></div></section>
@@ -1112,11 +1113,11 @@ function reportCuoi(){
   const its=items.filter(i=>ids.includes(i.owner)&&i.period===p&&(i.status==='duyet'||i.status==='khongdat')).sort((a,b)=>a.owner.localeCompare(b.owner)||(a.approvedAt<b.approvedAt?-1:1));
   return `<div class="head"><h2>Tổng hợp kết quả cuối tháng</h2><p>Kết quả, tổng điểm và xếp loại ${pLabel(p)}.${isOpen(p)?' <b>Tháng chưa chốt: số liệu tạm tính.</b>':''}</p></div>
     ${repFilters()}
-    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng điểm và xếp loại</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Tổ</th><th class="n">Đạt</th><th class="n">Vượt</th><th class="n">Không HT</th><th class="n">Không đảm bảo tiến độ</th><th class="n">Phát sinh</th><th>OKR (hệ số)</th><th class="n">Điểm phẩm chất</th><th class="n">Điểm KPI</th><th class="n">Điểm OKR</th><th class="n">Tổng</th><th>Xếp loại</th></tr></thead><tbody>
+    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng điểm và xếp loại</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Nhóm</th><th class="n">Đạt</th><th class="n">Vượt</th><th class="n">Không HT</th><th class="n">Không đảm bảo tiến độ</th><th class="n">Phát sinh</th><th>OKR (hệ số)</th><th class="n">Điểm phẩm chất</th><th class="n">Điểm KPI</th><th class="n">Điểm OKR</th><th class="n">Tổng</th><th>Xếp loại</th></tr></thead><tbody>
       ${ppl.map(x=>{const c=calc(x.id,p),f=finalRating(x.id,p);
         return `<tr><td>${esc(x.name)}</td><td>${esc(x.to)}</td><td class="n">${c.dat}</td><td class="n">${c.vuot}</td><td class="n ${c.miss?'neg':''}">${c.miss}</td><td class="n ${c.cham?'neg':''}">${c.cham}</td><td class="n">${c.ps}</td><td>${c.coefs.length?c.coefs.map(num).join(' · '):'0'}</td><td class="n">${num(c.pc)}</td><td class="n">${num(c.kpi)}</td><td class="n">${num(c.okr)}</td><td class="n"><b>${num(c.all)}</b></td><td><span class="chip c-${f}">${RT[f]}</span></td></tr>`;}).join('')||'<tr><td colspan="13" class="empty">Không có dữ liệu.</td></tr>'}
     </tbody></table></div></section>
-    <section class="panel"><div class="toolbar"><h3 class="h3">Chi tiết từng việc</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Tổ</th><th>Loại</th><th>Nội dung</th><th>Kết quả</th><th>Ngày nhập</th><th>Ngày duyệt</th><th>Người duyệt</th><th class="n">Điểm</th></tr></thead><tbody>
+    <section class="panel"><div class="toolbar"><h3 class="h3">Chi tiết từng việc</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Nhóm</th><th>Loại</th><th>Nội dung</th><th>Kết quả</th><th>Ngày nhập</th><th>Ngày duyệt</th><th>Người duyệt</th><th class="n">Điểm</th></tr></thead><tbody>
       ${its.map(i=>{const v=itemPts(i);return `<tr><td>${esc(uObj(i.owner).name)}</td><td>${esc(uObj(i.owner).to)}</td><td>${i.type==='OKR'?'OKR':i.src==='ps'?'KPI phát sinh':'KPI'}<div class="sub">${SRC[i.src]}</div></td><td>${esc(i.text)}</td><td>${statusCell(i)}</td><td class="dt">${fmtD(i.created)}</td><td class="dt">${fmt(i.approvedAt)}</td><td>${esc(i.approvedBy||'—')}</td><td class="n ${v<0?'neg':''}">${v?signed(v):'—'}</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty">Chưa có việc nào được duyệt.</td></tr>'}
     </tbody></table></div></section>`;
 }
@@ -1132,9 +1133,9 @@ function pickPool(ns){const st=PK[ns],m=st.mode,f=st.filter[m];let ppl=evalUsers
   const q=norm(st.q);if(q)ppl=ppl.filter(u=>norm(u.name+' '+u.id+' '+u.to+' '+u.cv).includes(q));return ppl;}
 function pickControls(ns){const st=PK[ns];
   return `<div class="pad row" style="padding-bottom:12px;align-items:end">
-    <div class="field" style="flex:0 1 200px"><label for="${ns}-mode">Chọn theo</label><select id="${ns}-mode" data-ns="${ns}" data-pk="mode"><option value="to" ${st.mode==='to'?'selected':''}>Tổ</option><option value="cv" ${st.mode==='cv'?'selected':''}>Chức vụ</option><option value="nguoi" ${st.mode==='nguoi'?'selected':''}>Từng cán bộ</option></select></div>
-    ${st.mode!=='nguoi'?`<div class="field" style="flex:0 1 220px"><label for="${ns}-filter">${st.mode==='to'?'Tổ':'Loại chức vụ'}</label><select id="${ns}-filter" data-ns="${ns}" data-pk="filter"><option value="*">Tất cả</option>${(st.mode==='to'?settings.tos:settings.cvs).filter(v=>evalUsers().some(u=>u[st.mode]===v)).map(v=>`<option ${st.filter[st.mode]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></div>`:''}
-    <div class="field" style="flex:1 1 220px"><label for="${ns}-q">Tìm cán bộ</label><input type="search" id="${ns}-q" data-ns="${ns}" data-pk="q" placeholder="Gõ tên, tổ hoặc chức vụ…" value="${esc(st.q)}"></div>
+    <div class="field" style="flex:0 1 200px"><label for="${ns}-mode">Chọn theo</label><select id="${ns}-mode" data-ns="${ns}" data-pk="mode"><option value="to" ${st.mode==='to'?'selected':''}>Nhóm</option><option value="cv" ${st.mode==='cv'?'selected':''}>Chức vụ</option><option value="nguoi" ${st.mode==='nguoi'?'selected':''}>Từng cán bộ</option></select></div>
+    ${st.mode!=='nguoi'?`<div class="field" style="flex:0 1 220px"><label for="${ns}-filter">${st.mode==='to'?'Nhóm':'Loại chức vụ'}</label><select id="${ns}-filter" data-ns="${ns}" data-pk="filter"><option value="*">Tất cả</option>${(st.mode==='to'?settings.tos:settings.cvs).filter(v=>evalUsers().some(u=>u[st.mode]===v)).map(v=>`<option ${st.filter[st.mode]===v?'selected':''}>${esc(v)}</option>`).join('')}</select></div>`:''}
+    <div class="field" style="flex:1 1 220px"><label for="${ns}-q">Tìm cán bộ</label><input type="search" id="${ns}-q" data-ns="${ns}" data-pk="q" placeholder="Gõ tên, nhóm hoặc chức vụ…" value="${esc(st.q)}"></div>
   </div>`;}
 function pickRows(ns,ppl,head,pre){const sel=pkSel[ns];
   queueMicrotask(()=>{const c=$('#pick-count');if(c)c.textContent=S.pick.size;const b=$('#btn-giao');if(b)b.disabled=!S.pick.size;const tg=$('#tip-giao');if(tg)tg.dataset.tip=S.pick.size?'':'Chọn ít nhất 1 người nhận để giao việc.';
@@ -1142,7 +1143,7 @@ function pickRows(ns,ppl,head,pre){const sel=pkSel[ns];
     document.querySelectorAll('[data-ind="1"]').forEach(x=>x.indeterminate=true);});
   if(!ppl.length)return '<div class="empty">Không có cán bộ nào khớp.</div>';
   const n=ppl.filter(u=>sel.has(u.id)).length;
-  return `<table class="ptable"><thead><tr><th class="cb">${head?`<input type="checkbox" data-act="pkset" data-ns="${ns}" ${n===ppl.length?'checked':''} data-ind="${n&&n<ppl.length?1:0}" aria-label="Chọn tất cả trong danh sách">`:''}</th><th>Họ tên ${head?`<span class="cnt">· đã chọn ${n}/${ppl.length}</span>`:''}</th><th>Tổ</th><th>Chức vụ</th></tr></thead><tbody>
+  return `<table class="ptable"><thead><tr><th class="cb">${head?`<input type="checkbox" data-act="pkset" data-ns="${ns}" ${n===ppl.length?'checked':''} data-ind="${n&&n<ppl.length?1:0}" aria-label="Chọn tất cả trong danh sách">`:''}</th><th>Họ tên ${head?`<span class="cnt">· đã chọn ${n}/${ppl.length}</span>`:''}</th><th>Nhóm</th><th>Chức vụ</th></tr></thead><tbody>
     ${ppl.map(u=>`<tr class="${sel.has(u.id)?'on':''}"><td class="cb"><input type="checkbox" id="${pre}-${u.id}" data-act="pk" data-ns="${ns}" data-u="${u.id}" ${sel.has(u.id)?'checked':''}></td><td><label for="${pre}-${u.id}">${esc(u.name)}${ns==='pq'&&u.id===S.pqMgr?' <span class="chip c-self">Tự duyệt</span>':''}</label></td><td>${esc(u.to)}</td><td>${esc(u.cv)}</td></tr>`).join('')}</tbody></table>`;}
 const pickList=ns=>pickRows(ns,pickPool(ns),true,ns);
 const giaoHas=d=>d&&(d.text||d.chiTieu||d.pick.size);
@@ -1219,7 +1220,7 @@ function tdView(){
     <section class="panel">
       <div class="toolbar">
         <input type="search" class="search" id="td-q" placeholder="Tìm cán bộ…" value="${esc(S.tdQ)}" aria-label="Tìm cán bộ">
-        ${tos.length>1?`<select id="td-to" aria-label="Lọc tổ"><option value="*">Tất cả tổ</option>${tos.map(t=>`<option ${S.tdTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>`:''}
+        ${tos.length>1?`<select id="td-to" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${tos.map(t=>`<option ${S.tdTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>`:''}
         <select id="td-f" aria-label="Lọc tình trạng">${[['all','Tất cả'],['nokpi','Chưa đăng ký KPI'],['nookr','Chưa có OKR'],['ok','Đã nhập đủ']].map(([k,l])=>`<option value="${k}" ${S.tdF===k?'selected':''}>${l}</option>`).join('')}</select>
         <div class="spacer"></div>
         <button class="btn sm" data-act="td-pickmiss">Chọn người chưa nhập</button>
@@ -1312,7 +1313,7 @@ function reportData(uid,p){
   const ns=u.ngaySinh?u.ngaySinh.split('-').reverse().join('/'):'';
   const nx=k=>(rep.nx[k]||'').trim()||'Không.';
   return {dia_danh:settings.diaDanh,ngay:d[2],thang:String(Number(m)),nam:y,don_vi_hoa:settings.tenDonVi.toUpperCase(),
-    ho_ten:u.name,ngay_sinh:ns,cap_bac:u.capBac||'',chuc_vu:u.cv,don_vi_cong_tac:`${u.to} - ${settings.tenDonVi}, ${settings.tinhTP}`,
+    ho_ten:u.name,ngay_sinh:ns,cap_bac:u.capBac||'',chuc_vu:u.cv,don_vi_cong_tac:`${u.toCT||u.to} - ${settings.tenDonVi}, ${settings.tinhTP}`,
     okr:its.filter(i=>i.type==='OKR').map((i,k)=>({tt:k+1,nhiem_vu:i.text,ket_qua:'',muc_do:lvWord(i),diem:i.status==='duyet'?num(i.coef*c.tb):'0',nguyen_nhan:i.status==='khongdat'?(i.reason||''):i.status==='duyet'?'Không':'Chưa được duyệt'})),
     kpi:sortKpi(its.filter(i=>i.type==='KPI')).map((i,k)=>({tt:k+1,nhiem_vu:i.text+(i.src==='ps'?' (phát sinh)':''),chi_tieu:i.chiTieu||'',ket_qua:'',san_pham:'',
       chat_luong:i.status==='duyet'?(i.level==='vuot'?'Vượt yêu cầu':'Đạt yêu cầu'):i.status==='khongdat'?'Không đạt':'Chưa đánh giá',tien_do:i.status==='duyet'?(i.cham?'Không đảm bảo':'Đảm bảo'):i.status==='khongdat'?'Không hoàn thành':'Chưa hoàn thành'})),
@@ -1349,7 +1350,7 @@ function ctView(){
         <button class="btn" data-act="preview" data-k="plan" data-u="${u.id}" data-p="${p}">Xem trước bản in</button>
         <button class="btn ${locked?'pri':''}" data-act="exportplan" data-u="${u.id}" data-p="${p}">Xuất Word</button></div>
       <ul class="checklist">${ck(c.n>0,c.n?`Đã có ${c.n} KPI (${c.giao} được giao, ${c.dk} tự đăng ký)`:'Chưa có KPI nào')}${ck(okr.length>0,okr.length?`Đã có ${okr.length} OKR`:'Chưa có OKR (cần để xét Xuất sắc)')}${ck(!noSp,noSp?`${noSp} việc chưa ghi sản phẩm đầu ra`:'Đã ghi sản phẩm cho mọi việc')}${ck(!regLocked(p),regLocked(p)?`Đã qua hạn chốt đăng ký KPI ${fmt(lockDate(p))}`:`Hạn chốt đăng ký KPI ${fmt(lockDate(p))}`)}</ul>
-      ${pt?`<p class="formula" style="margin:0">Lãnh đạo, chỉ huy phụ trách (${esc(u.to)}): <b>${esc(pt)}</b> · QTV cài ở mục Cài đặt.</p>`:`<p class="formula" style="margin:0">Tổ ${esc(u.to)} chưa được cài lãnh đạo phụ trách. Báo QTV cài ở mục Cài đặt.</p>`}
+      ${pt?`<p class="formula" style="margin:0">Lãnh đạo, chỉ huy phụ trách (${esc(u.to)}): <b>${esc(pt)}</b> · QTV cài ở mục Cài đặt.</p>`:`<p class="formula" style="margin:0">${esc(u.to)} chưa được cài lãnh đạo phụ trách. Báo QTV cài ở mục Cài đặt.</p>`}
       ${wordLegend()}
     </section>
     <section class="panel"><div class="toolbar"><h3 class="h3">I. Nhiệm vụ trọng tâm (OKR tháng)</h3><div class="spacer"></div>${wtag('bảng mục I')}</div><div class="tw"><table class="wide"><thead><tr><th>TT</th><th>Nội dung công việc</th><th>Sản phẩm đầu ra</th><th>Yêu cầu chất lượng, hiệu quả</th><th>Lãnh đạo phụ trách</th><th>Thời gian hoàn thành</th></tr></thead><tbody>
@@ -1377,8 +1378,8 @@ const dk2Preview=t=>dk2Lines(t).map(s=>`<li>${esc(s)}</li>`).join('')||'<li clas
 function planData(uid,p){
   const u=uObj(uid),pl=getPlan(uid,p),[y,m]=p.split('-'),its=items.filter(i=>i.owner===uid&&i.period===p&&i.src!=='ps');
   const d=(pl.status==='danop'&&pl.at?pl.at:nowISO()).slice(0,10).split('-'),pt=phuTrachOf(u);
-  return {to_hoa:u.to.toUpperCase(),dia_danh:settings.diaDanh,ngay:d[2],thang_lap:String(Number(d[1])),nam_lap:d[0],thang:String(Number(m)),nam:y,
-    ho_ten:u.name,ngay_sinh:u.ngaySinh?u.ngaySinh.split('-').reverse().join('/'):'',cap_bac:u.capBac||'',chuc_vu:u.cv,don_vi_cong_tac:`${u.to} - ${settings.tenDonVi}, ${settings.tinhTP}`,
+  return {to_hoa:(u.toCT||u.to).toUpperCase(),dia_danh:settings.diaDanh,ngay:d[2],thang_lap:String(Number(d[1])),nam_lap:d[0],thang:String(Number(m)),nam:y,
+    ho_ten:u.name,ngay_sinh:u.ngaySinh?u.ngaySinh.split('-').reverse().join('/'):'',cap_bac:u.capBac||'',chuc_vu:u.cv,don_vi_cong_tac:`${u.toCT||u.to} - ${settings.tenDonVi}, ${settings.tinhTP}`,
     okr:its.filter(i=>i.type==='OKR').map((i,k)=>({tt:k+1,nhiem_vu:i.text,san_pham:i.spDuKien||'',yeu_cau:i.yeuCau||'',phu_trach:pt,thoi_gian:i.thoiGian||'Trong tháng'})),
     kpi:sortKpi(its.filter(i=>i.type==='KPI')).map((i,k)=>({tt:k+1,nhiem_vu:i.text,san_pham:i.spDuKien||'',chi_tieu:i.chiTieu||'',yeu_cau:i.yeuCau||'Trong tháng',phu_trach:pt})),
     dk1:(pl.dk[0]||'').trim(),dk2:dk2Lines(pl.dk[1]),dk3:(pl.dk[2]||'').trim(),
@@ -1452,7 +1453,7 @@ function pqView(){
       <div class="toolbar"><h3 class="h3">Danh sách phân quyền</h3><div class="spacer"></div>
         <input type="search" id="pq-ls" placeholder="Tìm người…" value="${esc(S.pqLQ||'')}" style="width:auto;flex:0 1 220px" aria-label="Tìm người">
         <select id="pq-lf" style="width:auto" aria-label="Lọc"><option value="mgr" ${S.pqLF==='mgr'?'selected':''}>Đang có quyền duyệt</option><option value="all" ${S.pqLF==='all'?'selected':''}>Tất cả cán bộ</option><option value="none" ${S.pqLF==='none'?'selected':''}>Chưa có người duyệt</option></select></div>
-      <div class="tw"><table><thead><tr><th>Họ tên</th><th>Tổ · Chức vụ</th><th>Đang duyệt cho</th><th>Được duyệt bởi</th><th class="n">Thao tác</th></tr></thead><tbody>
+      <div class="tw"><table><thead><tr><th>Họ tên</th><th>Nhóm · Chức vụ</th><th>Đang duyệt cho</th><th>Được duyệt bởi</th><th class="n">Thao tác</th></tr></thead><tbody>
       ${rows.map(x=>{const ds=subsOf(x.id);return `<tr class="${x.id===S.pqMgr?'on':''}"><td><b>${esc(x.name)}</b><div class="sub">${esc(x.id)}</div></td><td>${esc(x.to)}<div class="sub">${esc(x.cv)}</div></td>
         <td>${ds.length?`<b>${ds.length} người</b><div class="sub" style="max-width:380px">${ds.map(u=>u.id===x.id?'Chính mình':esc(u.name)).join(', ')}</div>`:'<span class="sub">—</span>'}</td>
         <td>${x.approvers.length?x.approvers.map(a=>a===x.id?'Tự duyệt':esc(uObj(a)?.name||a)).join('<br>'):'<span class="neg">Chưa có</span>'}</td>
@@ -1469,7 +1470,7 @@ function libView(){
   const q=norm((S.libQ||'').trim()),ft=S.libT||'*',fg=gOpts.includes(S.libG)?S.libG:'*';
   const list=library.filter(t=>(ft==='*'||t.type===ft)&&(fo==='*'||libTo(t)===fo)&&(fg==='*'||t.group===fg)&&(!q||norm(t.text+' '+t.group).includes(q)))
     .sort((a,b)=>a.group.localeCompare(b.group,'vi')||a.type.localeCompare(b.type));
-  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo tổ và vị trí việc làm (Phụ lục 2 cho KPI, Phụ lục 3 cho OKR). Khi tự đăng ký, cán bộ chỉ thấy gợi ý của tổ mình (theo ô Tổ ở trang Tài khoản) và nhóm Chung. Tên nhóm viết dạng "Tên tổ · vị trí việc làm".</p></div>
+  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo tổ và vị trí việc làm (Phụ lục 2 cho KPI, Phụ lục 3 cho OKR). Khi tự đăng ký, cán bộ chỉ thấy gợi ý của tổ mình (theo ô Tổ ở trang Tài khoản) và mục Chung. Tên nhóm viết dạng "Tên tổ · vị trí việc làm".</p></div>
     <form class="panel pad row" id="f-lib">
       <div class="field" style="flex:0 1 140px"><label for="lb-type">Loại</label><select id="lb-type"><option>KPI</option><option>OKR</option></select></div>
       <div class="field" style="flex:1 1 200px"><label for="lb-group">Vị trí việc làm / nhóm</label><input type="text" id="lb-group" list="lb-groups" required placeholder="vd: Cán bộ địa bàn"><datalist id="lb-groups">${groups.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
@@ -1524,7 +1525,8 @@ function accounts(){
         <div class="field"><label for="nu-name">Họ tên</label><input type="text" id="nu-name" required value="${f?esc(f.name):''}" placeholder="Ví dụ: Vương Hoàng Việt"></div>
         <div class="field"><label for="nu-cb">Cấp bậc</label><select id="nu-cb">${CAP_BAC.map(t=>`<option ${f&&f.capBac===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="field"><label for="nu-ns">Ngày sinh</label><input type="date" id="nu-ns" value="${f?esc(f.ngaySinh||''):''}"></div>
-        <div class="field"><label for="nu-to">Tổ</label><select id="nu-to">${settings.tos.map(t=>`<option ${f&&f.to===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+        <div class="field"><label for="nu-toct">Tổ</label><input type="text" id="nu-toct" list="nu-toct-list" autocomplete="off" placeholder="Ví dụ: Tổ An ninh" value="${f?esc(f.toCT||''):''}"><datalist id="nu-toct-list">${toList().map(t=>`<option value="${esc(t)}">`).join('')}</datalist></div>
+        <div class="field"><label for="nu-to">Nhóm</label><select id="nu-to">${settings.tos.map(t=>`<option ${f&&f.to===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
         <div class="field"><label for="nu-cv">Chức vụ</label><select id="nu-cv">${settings.cvs.map(t=>`<option ${f?f.cv===t?'selected':'':t==='Cán bộ'?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
         <div class="field"><label for="nu-role">Vai trò</label><select id="nu-role"><option value="cb" ${!f||f.role!=='ql'?'selected':''}>Cán bộ</option><option value="ql" ${f&&f.role==='ql'?'selected':''}>Quản lý</option></select></div>
         <div class="field"><label for="nu-extra">Quyền khác</label><select id="nu-extra">${(()=>{const cur=f?(f.isAdmin?(f.evaluated===false?'an':'a'):(f.evaluated===false?'x':'n')):'n';return [['n','Không có · được chấm điểm'],['a','Quản trị viên · được chấm điểm'],['an','Quản trị viên · không chấm điểm'],['x','Không chấm điểm (không tính KPI/OKR)']].map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');})()}</select></div>
@@ -1535,12 +1537,12 @@ function accounts(){
     <section class="panel">
       <div class="toolbar">
         <input type="search" class="search" id="acc-q" placeholder="Tìm theo tên, tên đăng nhập…" value="${esc(S.accQ||'')}" aria-label="Tìm tài khoản">
-        <select id="acc-to" aria-label="Lọc tổ"><option value="*">Tất cả tổ</option>${settings.tos.map(t=>`<option ${S.accTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+        <select id="acc-to" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${settings.tos.map(t=>`<option ${S.accTo===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
         <span class="sub" style="margin:0">${accList().length}/${users.length} tài khoản</span>
       </div>
-      <div class="tw"><table class="wide"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Cấp bậc · Ngày sinh</th><th>Tổ · Chức vụ</th><th>Vai trò</th><th>Người duyệt</th><th>Trạng thái</th><th class="n">Thao tác</th></tr></thead><tbody>
+      <div class="tw"><table class="wide"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Cấp bậc · Ngày sinh</th><th>Tổ</th><th>Nhóm · Chức vụ</th><th>Vai trò</th><th>Người duyệt</th><th>Trạng thái</th><th class="n">Thao tác</th></tr></thead><tbody>
     ${accList().length?'':'<tr><td colspan="8" class="empty">Không tìm thấy tài khoản nào.</td></tr>'}
-    ${accList().map(x=>`<tr><td><b>${esc(x.id)}</b>${x.isAdmin?'<div class="sub">Quản trị viên</div>':''}</td><td>${esc(x.name)}</td><td>${esc(x.capBac||'—')}<div class="sub">${x.ngaySinh?fmt(x.ngaySinh):'—'}</div></td><td>${esc(x.to)}<div class="sub">${esc(x.cv)}</div></td><td>${roleOf(x)}</td>
+    ${accList().map(x=>`<tr><td><b>${esc(x.id)}</b>${x.isAdmin?'<div class="sub">Quản trị viên</div>':''}</td><td>${esc(x.name)}</td><td>${esc(x.capBac||'—')}<div class="sub">${x.ngaySinh?fmt(x.ngaySinh):'—'}</div></td><td>${esc(x.toCT||'')||'<span class="sub">Chưa chọn</span>'}</td><td>${esc(x.to)}<div class="sub">${esc(x.cv)}</div></td><td>${roleOf(x)}</td>
       <td>${x.approvers.length?x.approvers.map(a=>a===x.id?'Tự duyệt':esc(uObj(a)?.name||a)).join('<br>'):'<span class="neg">Chưa có</span>'}</td>
       <td>${x.active?'<span class="chip c-duyet">Đang dùng</span>':'<span class="chip c-lock">Đã khóa</span>'}</td>
       <td><div class="acts"><button class="btn sm" data-act="edit-user" data-u="${x.id}">Sửa</button><button class="btn sm" data-act="reset" data-u="${x.id}">Đặt lại MK</button>${x.id===S.user?'':`<button class="btn sm ${x.active?'bad':''}" data-act="toggle-user" data-u="${x.id}">${x.active?'Khóa':'Mở khóa'}</button>`}</div></td></tr>`).join('')}
@@ -1558,18 +1560,18 @@ function settingsView(){
     ?`<div class="acts"><span class="sub" style="margin:0">Xóa "${esc(v)}"?</span><button class="btn sm bad" data-act="set-del-yes">Xóa</button><button class="btn sm ghost" data-act="set-del-no">Hủy</button></div>`
     :`<div class="acts"><button class="btn sm" data-act="set-edit" data-k="${kind}" data-i="${i}">Sửa</button><button class="btn sm ghost" data-act="set-del" data-k="${kind}" data-i="${i}" ${n?`disabled title="Đang có ${n} cán bộ thuộc mục này. Chuyển họ sang mục khác ở trang Tài khoản trước khi xóa."`:''}>Xóa</button></div>`;
   return `<div class="head"><h2>Cài đặt</h2><p>Áp dụng chung cho cả đơn vị.</p></div>
-    <nav class="stabs" aria-label="Mục cài đặt">${[['st-to','Tổ & lãnh đạo phụ trách'],['st-cv','Chức vụ'],['st-diem','Cách tính điểm'],['st-in','Thông tin in Word']].map(([id,l])=>`<button type="button" data-act="set-jump" data-to="${id}">${l}</button>`).join('')}</nav>
+    <nav class="stabs" aria-label="Mục cài đặt">${[['st-to','Nhóm & lãnh đạo phụ trách'],['st-cv','Chức vụ'],['st-diem','Cách tính điểm'],['st-in','Thông tin in Word']].map(([id,l])=>`<button type="button" data-act="set-jump" data-to="${id}">${l}</button>`).join('')}</nav>
 
     <section class="panel" id="st-to">
-      <div class="toolbar"><div style="flex:1 1 260px"><h3 class="h3">Tổ và lãnh đạo, chỉ huy phụ trách</h3>
-        <div class="sub">Lãnh đạo phụ trách được in vào Chương trình công tác tháng của cán bộ trong tổ. Khác với người duyệt trong app.</div></div>
-        <button class="btn pri" data-act="set-add" data-k="to">+ Thêm tổ</button></div>
-      ${noLead?`<div class="sbanner"><b>!</b> ${noLead} tổ chưa có lãnh đạo phụ trách. Chương trình tháng của cán bộ các tổ này sẽ để trống cột "Lãnh đạo, chỉ huy phụ trách".</div>`:''}
-      <div class="tw"><table class="stbl"><thead><tr><th style="width:28%">Tổ</th><th>Lãnh đạo, chỉ huy phụ trách</th><th class="n" style="width:110px">Số cán bộ</th><th style="width:150px"></th></tr></thead><tbody>
+      <div class="toolbar"><div style="flex:1 1 260px"><h3 class="h3">Nhóm và lãnh đạo, chỉ huy phụ trách</h3>
+        <div class="sub">Lãnh đạo phụ trách được in vào Chương trình công tác tháng của cán bộ trong nhóm. Tổ công tác (PCTP, An ninh…) cài riêng cho từng người ở trang Tài khoản. Khác với người duyệt trong app.</div></div>
+        <button class="btn pri" data-act="set-add" data-k="to">+ Thêm nhóm</button></div>
+      ${noLead?`<div class="sbanner"><b>!</b> ${noLead} nhóm chưa có lãnh đạo phụ trách. Chương trình tháng của cán bộ các tổ này sẽ để trống cột "Lãnh đạo, chỉ huy phụ trách".</div>`:''}
+      <div class="tw"><table class="stbl"><thead><tr><th style="width:28%">Nhóm</th><th>Lãnh đạo, chỉ huy phụ trách</th><th class="n" style="width:110px">Số cán bộ</th><th style="width:150px"></th></tr></thead><tbody>
       ${settings.tos.map((t,i)=>{const pt=(settings.phuTrach[t]||'').trim(),n=cnt('to',t);return `<tr>
         <td><b>${esc(t)}</b></td>
         <td>${pt?esc(pt):'<span class="chip c-cho">Chưa cài</span>'}</td>
-        <td class="n">${n}</td><td>${rowActs('to',i,t,n)}</td></tr>`;}).join('')||'<tr><td colspan="4" class="empty">Chưa có tổ nào. Bấm "+ Thêm tổ".</td></tr>'}
+        <td class="n">${n}</td><td>${rowActs('to',i,t,n)}</td></tr>`;}).join('')||'<tr><td colspan="4" class="empty">Chưa có nhóm nào. Bấm "+ Thêm nhóm".</td></tr>'}
       </tbody></table></div>
     </section>
 
@@ -1623,13 +1625,13 @@ function setModal(sm){
   const isTo=sm.kind==='to',list=isTo?settings.tos:settings.cvs,old=sm.i!=null?list[sm.i]:'';
   const leaders=[...new Set(Object.values(settings.phuTrach).map(v=>(v||'').trim()).filter(Boolean))];
   return `<div class="ov" data-act="set-close-ov"><form class="modal panel pad stack" id="f-setm" role="dialog" aria-modal="true" aria-labelledby="sm-h" style="max-width:480px">
-    <div class="mhead"><h3 class="h3" id="sm-h">${sm.i!=null?'Sửa':'Thêm'} ${isTo?'tổ':'chức vụ'}</h3><button class="btn ghost sm" type="button" data-act="set-close" aria-label="Đóng">✕</button></div>
-    <div class="field"><label for="sm-name">${isTo?'Tên tổ':'Tên chức vụ'}</label><input type="text" id="sm-name" required value="${esc(old)}" placeholder="${isTo?'Ví dụ: Tổ Cảnh sát khu vực':'Ví dụ: Phó trưởng'}"></div>
+    <div class="mhead"><h3 class="h3" id="sm-h">${sm.i!=null?'Sửa':'Thêm'} ${isTo?'nhóm':'chức vụ'}</h3><button class="btn ghost sm" type="button" data-act="set-close" aria-label="Đóng">✕</button></div>
+    <div class="field"><label for="sm-name">${isTo?'Tên nhóm':'Tên chức vụ'}</label><input type="text" id="sm-name" required value="${esc(old)}" placeholder="${isTo?'Ví dụ: Nhóm 1':'Ví dụ: Phó trưởng'}"></div>
     ${isTo?`<div class="field"><label for="sm-pt">Lãnh đạo, chỉ huy phụ trách</label><input type="text" id="sm-pt" list="sm-pt-list" value="${esc(old?settings.phuTrach[old]||'':'')}" placeholder="Ví dụ: Đ/c Trần Minh Bình - Phó trưởng">
       <datalist id="sm-pt-list">${leaders.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>
       <span class="sub">Chọn người đã có trong danh sách hoặc gõ mới. Có thể để trống và cài sau.</span></div>`
       :`<p class="formula" style="margin:0">Chức vụ bắt đầu bằng "Phó" được tính vào tỷ lệ 25% cấp Phó.</p>`}
-    ${sm.i!=null&&users.some(u=>u[isTo?'to':'cv']===old)?`<p class="formula" style="margin:0">Đổi tên sẽ cập nhật cho ${users.filter(u=>u[isTo?'to':'cv']===old).length} cán bộ đang thuộc ${isTo?'tổ':'chức vụ'} này.</p>`:''}
+    ${sm.i!=null&&users.some(u=>u[isTo?'to':'cv']===old)?`<p class="formula" style="margin:0">Đổi tên sẽ cập nhật cho ${users.filter(u=>u[isTo?'to':'cv']===old).length} cán bộ đang thuộc ${isTo?'nhóm':'chức vụ'} này.</p>`:''}
     <div class="err" id="sm-err"></div>
     <div class="row" style="justify-content:flex-end"><button class="btn ghost" type="button" data-act="set-close">Hủy</button><button class="btn pri" type="submit">${sm.i!=null?'Lưu':'Thêm'}</button></div>
   </form></div>`;
@@ -1804,7 +1806,7 @@ document.addEventListener('change',e=>{
 });
 
 function showSug(inp){const box=document.getElementById('sug-'+inp.id);if(!box)return;const q=norm(inp.value.trim());
-  const mine=inp.id==='it-text'?toKey(me().to):'';
+  const mine=inp.id==='it-text'?toKey(me().toCT||me().to):'';
   const list=library.filter(t=>t.type===inp.dataset.sug&&(!mine||libTo(t)===mine||libTo(t)==='Chung')&&(!q||norm(t.text+' '+t.group).includes(q))&&norm(t.text)!==q).slice(0,8);
   if(!list.length){box.hidden=true;return;}
   box.innerHTML='<div class="sughd">'+(mine?'Đầu việc mẫu của tổ '+esc(mine):'Đầu việc mẫu trong thư viện')+'</div>'+list.map(t=>`<button type="button" class="sugit" data-sugfor="${inp.id}" data-id="${t.id}"><span>${esc(t.text)}</span><small>${esc(t.group)}</small></button>`).join('');box.hidden=false;}
@@ -1869,14 +1871,14 @@ document.addEventListener('submit',e=>{
     toast(it.type==='KPI'?`Đã ghi Không hoàn thành: trừ ${num(2*calc(it.owner,it.period).tb)} điểm.`:'Đã ghi OKR Không hoàn thành (không trừ điểm).');}
   if(f.id==='f-setm'){const sm=S.setModal,isTo=sm.kind==='to',key=isTo?'tos':'cvs',list=settings[key],name=$('#sm-name').value.trim().replace(/\s+/g,' '),old=sm.i!=null?list[sm.i]:null;
     if(!name)return;
-    if(list.some((v,k)=>k!==sm.i&&norm(v)===norm(name))){$('#sm-err').textContent=`Đã có ${isTo?'tổ':'chức vụ'} "${name}".`;return;}
+    if(list.some((v,k)=>k!==sm.i&&norm(v)===norm(name))){$('#sm-err').textContent=`Đã có ${isTo?'nhóm':'chức vụ'} "${name}".`;return;}
     if(old==null)list.push(name);else if(old!==name){list[sm.i]=name;users.forEach(u=>{if(u[sm.kind]===old)u[sm.kind]=name;});if(isTo){settings.phuTrach[name]=settings.phuTrach[old];delete settings.phuTrach[old];}}
     if(isTo)settings.phuTrach[name]=$('#sm-pt').value.trim();
-    S.setModal=null;toast(old==null?`Đã thêm ${isTo?'tổ':'chức vụ'} "${name}".`:`Đã lưu ${isTo?'tổ':'chức vụ'} "${name}".`);render();return;}
+    S.setModal=null;toast(old==null?`Đã thêm ${isTo?'nhóm':'chức vụ'} "${name}".`:`Đã lưu ${isTo?'nhóm':'chức vụ'} "${name}".`);render();return;}
   if(f.id==='f-print'){['tenDonVi','tinhTP','diaDanh','kyTruong','kyPho'].forEach(k=>settings[k]=$('#pr-'+k).value.trim());toast('Đã lưu thông tin in báo cáo.');}
   if(f.id==='f-lib'){library.push({id:newId('t'),type:$('#lb-type').value,group:$('#lb-group').value.trim(),text:$('#lb-text').value.trim()});toast('Đã thêm vào thư viện.');}
   if(f.id==='f-period'){const v=$('#np').value,n=openPeriod(v);toast(n<0?`${pLabel(v)} đã có.`:`Đã mở ${pLabel(v)}. Tự giao lại ${n} việc lặp hằng tháng.`);}
-  if(f.id==='f-user'){const data={name:$('#nu-name').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
+  if(f.id==='f-user'){const data={name:$('#nu-name').value.trim(),toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
     if(S.editUser&&data.role!=='ql')users.forEach(u=>u.approvers=u.approvers.filter(a=>a!==S.editUser));
     if(S.editUser){const x=uObj(S.editUser);Object.assign(x,data);if(x.isAdmin&&x.evaluated&&!x.approvers.length)x.approvers=[x.id];toast('Đã lưu tài khoản.');S.editUser=null;}
     else{const id=$('#nu-id').value.trim().toLowerCase();if(uObj(id)){toast('Tên đăng nhập đã tồn tại.');render();return;}
