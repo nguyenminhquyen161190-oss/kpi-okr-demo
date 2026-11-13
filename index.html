@@ -616,6 +616,11 @@ const S={user:null,booting:true,view:'kpi',period:nowISO().slice(0,7),missFor:nu
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
+// Thư viện chia theo tổ: nhóm có dạng "Tên tổ · vị trí việc làm". toKey đổi tên tổ của tài khoản (vd "Tổ Cảnh sát khu vực", "CSKV") ra tên tổ trong thư viện.
+const LIB_TO={'An ninh':['an ninh','an'],'CSKV':['cskv','canh sat khu vuc'],'CSTT':['cstt','canh sat trat tu'],'PCTP':['pctp','phong chong toi pham'],'Tổng hợp':['tong hop','th']};
+const libTo=t=>String(t.group||'').split(' · ')[0];
+const toClean=s=>norm(s||'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim().replace(/^to /,'');
+const toKey=to=>{const n=toClean(to);if(!n)return '';return Object.keys(LIB_TO).find(k=>LIB_TO[k].includes(n))||[...new Set(library.map(libTo))].find(k=>toClean(k)===n)||'';};
 const num=n=>Number(n).toLocaleString('vi-VN',{maximumFractionDigits:2});
 const fmt=s=>{if(!s)return '—';const [d,t]=s.split(' ');const [y,m,dd]=d.split('-');return `${dd}/${m}/${y}${t?' '+t:''}`};
 const fmtD=s=>s?fmt(s.slice(0,10)):'—';
@@ -882,7 +887,7 @@ const VC={
   ps:{type:'KPI',srcs:['ps'],add:'ps',title:'KPI phát sinh',ph:'Ví dụ: Tham gia chốt kiểm soát đột xuất',
     intro:'Việc làm vượt mức, ngoài danh sách. Không tính vào số chia. Mỗi việc hoàn thành được cộng 1 × điểm TB.'},
   okr:{type:'OKR',srcs:['giao','dk'],add:'dk',title:'OKR',ph:'Ví dụ: Xây dựng mô hình an ninh trật tự điểm',
-    intro:'Nhiệm vụ trọng tâm, đột phá. Hoàn thành được cộng hệ số 1,5 – 5 × điểm TB do quản lý quyết định. Không hoàn thành không bị trừ.'},
+    intro:'Nhiệm vụ trọng tâm, đột phá. Hoàn thành được cộng hệ số 1,5 – 5 × điểm TB do quản lý quyết định. Không hoàn thành không bị trừ. OKR không có hạn chốt đăng ký: thêm được bất cứ lúc nào, kể cả cuối tháng, miễn là tháng chưa chốt.'},
 };
 const listOf=(v,uid,p)=>items.filter(i=>i.owner===uid&&(!p||i.period===p)&&i.type===VC[v].type&&VC[v].srcs.includes(i.src));
 const canEdit=i=>i.status==='chua'&&isOpen(i.period)&&i.src!=='giao';
@@ -1200,7 +1205,7 @@ function tdView(){
   const q=norm(S.tdQ);if(q)rows=rows.filter(r=>norm(r.x.name+' '+r.x.id+' '+r.x.to).includes(q));
   const order={nokpi:0,nookr:1,ok:2};rows=rows.slice().sort((a,b)=>order[a.st]-order[b.st]||a.x.name.localeCompare(b.x.name));
   const nSel=rows.filter(r=>S.tdSel.has(r.x.id)).length,tos=[...new Set(all.map(r=>r.x.to))];
-  const msg=S.tdMsg||`Đề nghị đồng chí nhập KPI, OKR ${pLabel(p)} trước hạn chốt ${fmt(ld)}.`;
+  const msg=S.tdMsg||`Đề nghị đồng chí đăng ký KPI ${pLabel(p)} trước hạn chốt ${fmt(ld)}. OKR thêm được đến hết tháng.`;
   const tile=(lbl,v,sub,f,cls='')=>`<button class="tile ${cls} ${S.tdF===f?'sel':''}" data-act="tdf" data-f="${f}"><span class="lbl">${lbl}</span><span class="v">${v}</span><span class="s">${sub}</span></button>`;
   return `<div class="head"><h2>Theo dõi nhập liệu · ${pLabel(p)}</h2><p>${me().isAdmin?'Toàn đơn vị':'Những người bạn được phân công duyệt'}. Theo dõi ai đã đăng ký KPI, OKR và nhắc người chưa nhập.</p></div>
     ${open?`<div class="notice ${days>=0?'info':''}">${days>0?`Hạn chốt đăng ký KPI: <b>${fmt(ld)}</b>, còn <b>${days} ngày</b>. Sau hạn này cán bộ không thêm được KPI tự đăng ký.`:days===0?`Hôm nay (<b>${fmt(ld)}</b>) là hạn chốt đăng ký KPI.`:`Đã qua hạn chốt đăng ký (${fmt(ld)}). Người chưa đăng ký chỉ còn KPI được giao.`}</div>`:`<div class="notice">${pLabel(p)} đã chốt.</div>`}
@@ -1343,7 +1348,7 @@ function ctView(){
         ${locked?`<button class="btn" data-act="ct-unsubmit">Rút lại để sửa</button>`:`<button class="btn" data-act="ct-copyprev">Lấy lại phần III tháng trước</button>${c.n?'<button class="btn pri" data-act="ct-submit">Nộp chương trình</button>':'<span class="tipw" tabindex="0" data-tip="Chỉ nộp được chương trình khi đã có ít nhất 1 KPI (được giao hoặc tự đăng ký)."><button class="btn pri" disabled>Nộp chương trình</button></span>'}`}
         <button class="btn" data-act="preview" data-k="plan" data-u="${u.id}" data-p="${p}">Xem trước bản in</button>
         <button class="btn ${locked?'pri':''}" data-act="exportplan" data-u="${u.id}" data-p="${p}">Xuất Word</button></div>
-      <ul class="checklist">${ck(c.n>0,c.n?`Đã có ${c.n} KPI (${c.giao} được giao, ${c.dk} tự đăng ký)`:'Chưa có KPI nào')}${ck(okr.length>0,okr.length?`Đã có ${okr.length} OKR`:'Chưa có OKR (cần để xét Xuất sắc)')}${ck(!noSp,noSp?`${noSp} việc chưa ghi sản phẩm đầu ra`:'Đã ghi sản phẩm cho mọi việc')}${ck(!regLocked(p),regLocked(p)?`Đã qua hạn chốt đăng ký ${fmt(lockDate(p))}`:`Hạn chốt đăng ký ${fmt(lockDate(p))}`)}</ul>
+      <ul class="checklist">${ck(c.n>0,c.n?`Đã có ${c.n} KPI (${c.giao} được giao, ${c.dk} tự đăng ký)`:'Chưa có KPI nào')}${ck(okr.length>0,okr.length?`Đã có ${okr.length} OKR`:'Chưa có OKR (cần để xét Xuất sắc)')}${ck(!noSp,noSp?`${noSp} việc chưa ghi sản phẩm đầu ra`:'Đã ghi sản phẩm cho mọi việc')}${ck(!regLocked(p),regLocked(p)?`Đã qua hạn chốt đăng ký KPI ${fmt(lockDate(p))}`:`Hạn chốt đăng ký KPI ${fmt(lockDate(p))}`)}</ul>
       ${pt?`<p class="formula" style="margin:0">Lãnh đạo, chỉ huy phụ trách (${esc(u.to)}): <b>${esc(pt)}</b> · QTV cài ở mục Cài đặt.</p>`:`<p class="formula" style="margin:0">Tổ ${esc(u.to)} chưa được cài lãnh đạo phụ trách. Báo QTV cài ở mục Cài đặt.</p>`}
       ${wordLegend()}
     </section>
@@ -1459,10 +1464,12 @@ function pqView(){
 // ================= QTV: THƯ VIỆN =================
 function libView(){
   const groups=[...new Set(library.map(t=>t.group))].sort((a,b)=>a.localeCompare(b,'vi'));
-  const q=norm((S.libQ||'').trim()),ft=S.libT||'*',fg=groups.includes(S.libG)?S.libG:'*';
-  const list=library.filter(t=>(ft==='*'||t.type===ft)&&(fg==='*'||t.group===fg)&&(!q||norm(t.text+' '+t.group).includes(q)))
+  const tosL=[...new Set(library.map(libTo))].sort((a,b)=>a.localeCompare(b,'vi')),fo=tosL.includes(S.libO)?S.libO:'*';
+  const gOpts=groups.filter(g=>fo==='*'||g.split(' · ')[0]===fo);
+  const q=norm((S.libQ||'').trim()),ft=S.libT||'*',fg=gOpts.includes(S.libG)?S.libG:'*';
+  const list=library.filter(t=>(ft==='*'||t.type===ft)&&(fo==='*'||libTo(t)===fo)&&(fg==='*'||t.group===fg)&&(!q||norm(t.text+' '+t.group).includes(q)))
     .sort((a,b)=>a.group.localeCompare(b.group,'vi')||a.type.localeCompare(b.type));
-  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo vị trí việc làm (Phụ lục 2 cho KPI, Phụ lục 3 cho OKR). Dùng để chọn nhanh khi giao việc hoặc khi cán bộ tự đăng ký: gõ vài chữ ở ô Nội dung là hiện gợi ý.</p></div>
+  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo tổ và vị trí việc làm (Phụ lục 2 cho KPI, Phụ lục 3 cho OKR). Khi tự đăng ký, cán bộ chỉ thấy gợi ý của tổ mình (theo ô Tổ ở trang Tài khoản) và nhóm Chung. Tên nhóm viết dạng "Tên tổ · vị trí việc làm".</p></div>
     <form class="panel pad row" id="f-lib">
       <div class="field" style="flex:0 1 140px"><label for="lb-type">Loại</label><select id="lb-type"><option>KPI</option><option>OKR</option></select></div>
       <div class="field" style="flex:1 1 200px"><label for="lb-group">Vị trí việc làm / nhóm</label><input type="text" id="lb-group" list="lb-groups" required placeholder="vd: Cán bộ địa bàn"><datalist id="lb-groups">${groups.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
@@ -1471,7 +1478,8 @@ function libView(){
     </form>
     <section class="panel"><div class="toolbar"><h3 class="h3">${list.length===library.length?`${library.length} đầu việc`:`${list.length} / ${library.length} đầu việc`}</h3><div class="spacer"></div>
         <select id="lib-t" aria-label="Lọc loại"><option value="*">KPI và OKR</option><option ${ft==='KPI'?'selected':''}>KPI</option><option ${ft==='OKR'?'selected':''}>OKR</option></select>
-        <select id="lib-g" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${groups.map(g=>`<option ${fg===g?'selected':''}>${esc(g)}</option>`).join('')}</select>
+        <select id="lib-o" aria-label="Lọc tổ"><option value="*">Tất cả tổ</option>${tosL.map(o=>`<option ${fo===o?'selected':''}>${esc(o)}</option>`).join('')}</select>
+        <select id="lib-g" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${gOpts.map(g=>`<option ${fg===g?'selected':''}>${esc(g)}</option>`).join('')}</select>
         <input type="search" class="search" id="lib-q" placeholder="Tìm đầu việc…" value="${esc(S.libQ||'')}" aria-label="Tìm đầu việc"></div>
       <div class="tw"><table><thead><tr><th>Loại</th><th>Vị trí việc làm / nhóm</th><th>Nội dung</th><th class="n">Thao tác</th></tr></thead><tbody>
       ${list.map(t=>`<tr><td><span class="chip ${t.type==='OKR'?'c-okr':'c-dk'}">${t.type}</span></td><td>${esc(t.group)}</td><td>${esc(t.text)}</td><td><div class="acts"><button class="btn sm ghost" data-act="lib-del" data-id="${t.id}">Xóa</button></div></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Không có đầu việc nào khớp.</td></tr>'}
@@ -1787,6 +1795,7 @@ document.addEventListener('change',e=>{
   if(t.id==='g-period'){S.giao.period=t.value;return;}
   if(t.id==='g-repeat'){S.giao.repeat=t.checked;return;}
   if(t.id==='lib-t'){S.libT=t.value;render();return;}
+  if(t.id==='lib-o'){S.libO=t.value;S.libG='*';render();return;}
   if(t.id==='lib-g'){S.libG=t.value;render();return;}
   if(t.id==='th-to'){S.thTo=t.value;render();return;}
   if(t.id==='rp-period'){S.rep.period=t.value;render();return;}
@@ -1795,9 +1804,10 @@ document.addEventListener('change',e=>{
 });
 
 function showSug(inp){const box=document.getElementById('sug-'+inp.id);if(!box)return;const q=norm(inp.value.trim());
-  const list=library.filter(t=>t.type===inp.dataset.sug&&(!q||norm(t.text+' '+t.group).includes(q))&&norm(t.text)!==q).slice(0,8);
+  const mine=inp.id==='it-text'?toKey(me().to):'';
+  const list=library.filter(t=>t.type===inp.dataset.sug&&(!mine||libTo(t)===mine||libTo(t)==='Chung')&&(!q||norm(t.text+' '+t.group).includes(q))&&norm(t.text)!==q).slice(0,8);
   if(!list.length){box.hidden=true;return;}
-  box.innerHTML='<div class="sughd">Đầu việc mẫu trong thư viện</div>'+list.map(t=>`<button type="button" class="sugit" data-sugfor="${inp.id}" data-id="${t.id}"><span>${esc(t.text)}</span><small>${esc(t.group)}</small></button>`).join('');box.hidden=false;}
+  box.innerHTML='<div class="sughd">'+(mine?'Đầu việc mẫu của tổ '+esc(mine):'Đầu việc mẫu trong thư viện')+'</div>'+list.map(t=>`<button type="button" class="sugit" data-sugfor="${inp.id}" data-id="${t.id}"><span>${esc(t.text)}</span><small>${esc(t.group)}</small></button>`).join('');box.hidden=false;}
 document.addEventListener('focusin',e=>{if(e.target.dataset&&e.target.dataset.sug)showSug(e.target);});
 document.addEventListener('focusout',e=>{if(e.target.dataset&&e.target.dataset.sug){const id=e.target.id;setTimeout(()=>{const b=document.getElementById('sug-'+id);if(b)b.hidden=true;},150);}});
 document.addEventListener('keydown',e=>{const sb=e.target.dataset&&e.target.dataset.sug&&document.getElementById('sug-'+e.target.id);if(e.key==='Escape'&&sb&&!sb.hidden){sb.hidden=true;return;}
