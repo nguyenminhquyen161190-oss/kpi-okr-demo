@@ -639,6 +639,9 @@ function scope(){const u=me();if(u.isAdmin)return users.filter(x=>x.evaluated);r
 function queue(){return items.filter(i=>(i.status==='cho'||i.status==='xinxoa')&&isOpen(i.period)&&canApproveOwner(i.owner));}
 
 // ================= TÍNH ĐIỂM =================
+// Điểm phẩm chất, đạo đức, lối sống, uy tín: mặc định mọi cán bộ được đủ 30 điểm. Tổng điểm = 30 + KPI + OKR.
+// Đề xuất xếp loại vẫn xét theo KPI + OKR (mốc 40 và 60), tức tổng điểm mốc 70 và 90.
+const PC=30;
 // Điểm TB = Điểm chuẩn (40) ÷ số KPI (được giao + tự đăng ký).
 // Điểm KPI = 40 + TB × số KPI phát sinh hoàn thành − 2 × TB × số KPI không hoàn thành − TB/3 × số KPI không đảm bảo tiến độ; thấp nhất 0.
 // Điểm OKR = Σ (hệ số 1,5–5 × TB) cho mỗi OKR hoàn thành; OKR không hoàn thành không bị trừ.
@@ -655,7 +658,7 @@ function calc(uid,p){
   const okrPts=okr.reduce((s,i)=>s+i.coef*tb,0);
   return {n,tb,giao:base.filter(i=>i.src==='giao').length,dk:base.filter(i=>i.src==='dk').length,
     done:done.length,dat:its.filter(i=>i.type==='KPI'&&i.status==='duyet'&&i.level!=='vuot').length,vuot:its.filter(i=>i.type==='KPI'&&i.status==='duyet'&&i.level==='vuot').length,miss:miss.length,left,ps,cham,
-    okrN:okr.length,coefs:okr.map(i=>i.coef),kpi:Math.max(0,raw),okr:okrPts,total:Math.max(0,raw)+okrPts,worst:Math.max(0,raw-2*tb*left)};
+    okrN:okr.length,coefs:okr.map(i=>i.coef),kpi:Math.max(0,raw),okr:okrPts,total:Math.max(0,raw)+okrPts,pc:PC,all:PC+Math.max(0,raw)+okrPts,worst:Math.max(0,raw-2*tb*left)};
 }
 const itemPts=i=>{const t=calc(i.owner,i.period).tb;
   if(i.type==='OKR')return i.status==='duyet'?i.coef*t:0;
@@ -666,7 +669,7 @@ const signed=v=>v>0?'+'+num(v):v<0?'−'+num(-v):'0';
 function propose(c){
   if(c.kpi<40)return c.okrN?{code:'HTT',note:'KPI dưới 40 nhưng có OKR: đề xuất nâng 1 mức (nếu thuộc tiêu chí Không hoàn thành thì nâng lên Hoàn thành nhiệm vụ)'}
     :{code:'HTNV',note:'KPI dưới 40: Hoàn thành nhiệm vụ hoặc Không hoàn thành nhiệm vụ, quản lý xem xét theo tiêu chí'};
-  if(c.total>=60)return c.okrN?{code:'HTXS',note:'Từ 60 điểm và có OKR hoàn thành; cần đảm bảo các tiêu chí khác'}:{code:'HTT',note:'Từ 60 điểm nhưng chưa có OKR hoàn thành nên chưa đủ điều kiện xuất sắc'};
+  if(c.total>=60)return c.okrN?{code:'HTXS',note:'KPI + OKR từ 60 điểm và có OKR hoàn thành; cần đảm bảo các tiêu chí khác'}:{code:'HTT',note:'KPI + OKR từ 60 điểm nhưng chưa có OKR hoàn thành nên chưa đủ điều kiện xuất sắc'};
   return {code:'HTT',note:'KPI + OKR từ 40 đến 59 điểm'};
 }
 const finalRating=(uid,p)=>ratings[p+'|'+uid]||propose(calc(uid,p)).code;
@@ -808,11 +811,11 @@ function overview(){
   const st={chua:cnt(i=>i.status==='chua'&&!i.reason),tralai:cnt(i=>i.status==='chua'&&i.reason),cho:cnt(i=>i.status==='cho'||i.status==='xinxoa'),
     duyet:cnt(i=>i.status==='duyet'),vuot:cnt(i=>i.status==='duyet'&&i.level==='vuot'),khong:cnt(i=>i.status==='khongdat'),
     ps:cnt(i=>i.src==='ps'),okr:cnt(i=>i.type==='OKR')};
-  const max=Math.max(80,Math.ceil((c.total+10)/10)*10),pos=v=>Math.min(100,v/max*100);
+  const max=Math.max(110,Math.ceil((c.all+10)/10)*10),pos=v=>Math.min(100,v/max*100);
   let hint;
   if(c.kpi<40)hint=`Điểm KPI đang dưới 40: còn thiếu ${num(40-c.kpi)} điểm để đạt mức Hoàn thành tốt.${c.okrN?' Có OKR hoàn thành nên có thể được xét nâng 1 mức.':''}`;
   else if(c.total<60)hint=`Cần thêm ${num(60-c.total)} điểm${c.okrN?'':' và ít nhất 1 OKR hoàn thành'} để được xét Hoàn thành xuất sắc.`;
-  else hint=c.okrN?'Đã đủ điểm và có OKR hoàn thành: đủ điều kiện điểm để được xét Hoàn thành xuất sắc.':'Đã đủ 60 điểm. Cần ít nhất 1 OKR hoàn thành để được xét Hoàn thành xuất sắc.';
+  else hint=c.okrN?'Đã đủ điểm và có OKR hoàn thành: đủ điều kiện điểm để được xét Hoàn thành xuất sắc.':'Đã đủ 60 điểm KPI + OKR. Cần ít nhất 1 OKR hoàn thành để được xét Hoàn thành xuất sắc.';
   const [y,m]=p.split('-').map(Number),today=nowISO().slice(0,10),end=`${p}-${pad(new Date(y,m,0).getDate())}`;
   const daysLeft=Math.round((Date.parse(end)-Date.parse(today))/864e5);
   const timeline=!open?'Tháng đã chốt':today<`${p}-01`?`Kỳ bắt đầu ${fmt(p+'-01')}`:daysLeft<0?'Đã hết tháng, chờ chốt':daysLeft===0?'Hôm nay là ngày cuối tháng':`Còn ${daysLeft} ngày đến cuối tháng`;
@@ -822,7 +825,7 @@ function overview(){
   const todo=open?mine.filter(i=>i.status==='chua').sort((a,b)=>(b.reason?1:0)-(a.reason?1:0)||(a.src==='giao'?-1:1)).slice(0,6):[];
   const recent=items.filter(i=>i.owner===u.id&&(i.status==='duyet'||i.status==='khongdat')&&i.approvedAt).sort((a,b)=>a.approvedAt<b.approvedAt?1:-1).slice(0,5);
   const hist=periods.filter(x=>`${x.id}-01`<=today).map(x=>({p:x.id,open:x.state==='open',c:calc(u.id,x.id),f:finalRating(u.id,x.id)})).filter(x=>x.c.n||x.c.okrN);
-  const hmax=Math.max(60,...hist.map(h=>h.c.total));
+  const hmax=Math.max(90,...hist.map(h=>h.c.all));
   const goOf=i=>i.type==='OKR'?'okr':i.src==='ps'?'ps':'kpi';
   const myRem=reminders.filter(r=>r.uid===u.id&&!r.seen);
   return `${myRem.length?`<div class="remind-banner" role="status"><div><b>Nhắc nhở từ ${esc(uObj(myRem.at(-1).by)?.name||'quản lý')}</b> · ${fmt(myRem.at(-1).at)}<div>${esc(myRem.at(-1).text)}</div></div><button class="btn sm" data-act="rem-seen">Đã xem</button></div>`:''}
@@ -830,15 +833,15 @@ function overview(){
   <section class="panel hero">
     <div class="hl">
       <span class="lbl">Tổng điểm tháng${open?' · tạm tính':''}</span>
-      <div class="big">${num(c.total)}</div>
-      <div class="eq">KPI <b>${num(c.kpi)}</b> + OKR <b>${num(c.okr)}</b></div>
+      <div class="big">${num(c.all)}</div>
+      <div class="eq">Phẩm chất <b>${num(c.pc)}</b> + KPI <b>${num(c.kpi)}</b> + OKR <b>${num(c.okr)}</b></div>
       <div class="rt"><span class="chip c-${fr}">${RT[fr]}</span><span class="sub" style="margin:0">${chosen?'Quản lý đã xếp loại':'Dự kiến, quản lý chốt cuối tháng'}</span></div>
     </div>
     <div class="hr">
-      <div class="scale" role="img" aria-label="Tổng ${num(c.total)} điểm, mốc 40 và 60">
-        <div class="track"><i style="width:${pos(c.total)}%"></i></div>
-        <span class="mk" style="left:${pos(40)}%"><span><b>40</b><em> Hoàn thành tốt</em></span></span>
-        <span class="mk" style="left:${pos(60)}%"><span><b>60</b><em> Xuất sắc</em></span></span>
+      <div class="scale" role="img" aria-label="Tổng ${num(c.all)} điểm, mốc ${PC+40} và ${PC+60}">
+        <div class="track"><i style="width:${pos(c.all)}%"></i></div>
+        <span class="mk" style="left:${pos(PC+40)}%"><span><b>${PC+40}</b><em> Hoàn thành tốt</em></span></span>
+        <span class="mk" style="left:${pos(PC+60)}%"><span><b>${PC+60}</b><em> Xuất sắc</em></span></span>
       </div>
       <p class="hint">${hint}</p>
       ${c.left&&open?`<p class="warnline">Còn ${c.left} KPI chưa hoàn thành. Hết tháng chưa báo hoàn thành thì tự chuyển Không hoàn thành, mỗi việc bị trừ ${num(2*c.tb)} điểm.</p>`:''}
@@ -865,7 +868,7 @@ function overview(){
     </section>
     <div class="stack" style="gap:20px">
       <section class="panel"><div class="toolbar"><h3 class="h3">Điểm các tháng</h3></div>
-        <ul class="mbars">${hist.map(h=>`<li><span class="ml">${pLabel(h.p).replace('Tháng ','T')}${h.open?'<small>tạm tính</small>':''}</span><span class="mt"><i style="width:${h.c.total/hmax*100}%"></i></span><b>${num(h.c.total)}</b><span class="chip c-${h.f}">${RTS[h.f]}</span></li>`).join('')||'<li class="sub">Chưa có dữ liệu.</li>'}</ul></section>
+        <ul class="mbars">${hist.map(h=>`<li><span class="ml">${pLabel(h.p).replace('Tháng ','T')}${h.open?'<small>tạm tính</small>':''}</span><span class="mt"><i style="width:${h.c.all/hmax*100}%"></i></span><b>${num(h.c.all)}</b><span class="chip c-${h.f}">${RTS[h.f]}</span></li>`).join('')||'<li class="sub">Chưa có dữ liệu.</li>'}</ul></section>
       <section class="panel"><div class="toolbar"><h3 class="h3">Duyệt gần đây</h3></div>
         <ul class="todo">${recent.map(i=>{const v=itemPts(i);return `<li><div><div>${esc(i.text)}</div><div class="sub">${fmt(i.approvedAt)} · ${esc(uObj(i.approvedBy)?.name||i.approvedBy)}</div></div><div class="n">${statusCell(i)}${v?`<div class="${v<0?'neg':''}" style="font-weight:600">${signed(v)}</div>`:''}</div></li>`;}).join('')||'<li class="sub">Chưa có.</li>'}</ul></section>
     </div>
@@ -1067,12 +1070,12 @@ function summary(){
       <div class="tw"><table class="sumt"><thead><tr><th>Hạng</th><th>Cán bộ</th><th>Kết quả KPI</th><th class="n">Tổng điểm</th><th>Hệ thống đề xuất</th><th>Lý do đề xuất</th><th>Xếp loại chốt</th><th>Báo cáo tháng</th><th class="n">Đang chờ duyệt</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td class="rank ${r.rank===1?'top':''}">${r.rank}</td><td>${esc(r.x.name)}<div class="sub">${esc(r.x.to)} · ${esc(r.x.cv)}</div></td>
         <td>${r.c.n?`<b>${r.c.done}/${r.c.n}</b> hoàn thành`:'<span class="sub">Chưa có KPI</span>'}<div class="sub">${[r.c.vuot?`${r.c.vuot} vượt chỉ tiêu`:'',r.c.miss?`<span class="neg">${r.c.miss} không hoàn thành</span>`:'',r.c.cham?`<span class="neg">${r.c.cham} chậm tiến độ</span>`:'',r.c.ps?`${r.c.ps} phát sinh`:''].filter(Boolean).join(' · ')||(r.c.n?`Điểm 1 KPI: ${num(r.c.tb)}`:'')}</div></td>
-        <td class="n"><b class="tot">${num(r.c.total)}</b><div class="sub">KPI ${num(r.c.kpi)} + OKR ${num(r.c.okr)}</div>${r.c.kpi<40?'<div class="sub neg">KPI dưới 40</div>':''}</td>
+        <td class="n"><b class="tot">${num(r.c.all)}</b><div class="sub">Phẩm chất ${num(r.c.pc)} + KPI ${num(r.c.kpi)} + OKR ${num(r.c.okr)}</div>${r.c.kpi<40?'<div class="sub neg">KPI dưới 40</div>':''}</td>
         <td><span class="chip c-${r.pr.code}" title="${RT[r.pr.code]}">${RTS[r.pr.code]}</span></td><td class="why2">${esc(r.pr.note)}</td>
         <td>${canApproveOwner(r.x.id)?`<select data-act="rate" data-u="${r.x.id}" aria-label="Xếp loại ${esc(r.x.name)}" ${ratings[p+'|'+r.x.id]?'':'class="unset"'}><option value="">Chưa chọn</option>${Object.keys(RT).map(k=>`<option value="${k}" ${ratings[p+'|'+r.x.id]===k?'selected':''}>${RTS[k]}</option>`).join('')}</select>${ratings[p+'|'+r.x.id]&&ratings[p+'|'+r.x.id]!==r.pr.code?'<div class="sub">Khác đề xuất</div>':''}`:ratings[p+'|'+r.x.id]?`<span class="chip c-${r.f}">${RT[r.f]}</span>`:'<span class="sub">Chưa chọn</span>'}</td>
         <td class="nowrap">${repCell(r.x.id,p)}</td><td class="n">${r.pend?`<span class="chip c-cho">${r.pend} việc</span>`:'—'}</td></tr>`).join('')||'<tr><td colspan="9" class="empty">Không có dữ liệu.</td></tr>'}
       </tbody></table></div></section>
-    <p class="formula">Tổng điểm = Điểm KPI + Điểm OKR. "Hệ thống đề xuất" tính theo Hướng dẫn số 20, lý do ghi ở cột bên cạnh; quản lý chọn mức ở cột "Xếp loại chốt". Vượt chỉ tiêu chỉ ghi nhận, không cộng điểm.</p>`;
+    <p class="formula">Tổng điểm = Điểm phẩm chất (mặc định ${PC}) + Điểm KPI + Điểm OKR. "Hệ thống đề xuất" tính theo Hướng dẫn số 20, xét trên KPI + OKR (mốc 40 và 60), lý do ghi ở cột bên cạnh; quản lý chọn mức ở cột "Xếp loại chốt". Vượt chỉ tiêu chỉ ghi nhận, không cộng điểm.</p>`;
 }
 
 // ================= BÁO CÁO =================
@@ -1104,9 +1107,9 @@ function reportCuoi(){
   const its=items.filter(i=>ids.includes(i.owner)&&i.period===p&&(i.status==='duyet'||i.status==='khongdat')).sort((a,b)=>a.owner.localeCompare(b.owner)||(a.approvedAt<b.approvedAt?-1:1));
   return `<div class="head"><h2>Tổng hợp kết quả cuối tháng</h2><p>Kết quả, tổng điểm và xếp loại ${pLabel(p)}.${isOpen(p)?' <b>Tháng chưa chốt: số liệu tạm tính.</b>':''}</p></div>
     ${repFilters()}
-    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng điểm và xếp loại</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Tổ</th><th class="n">Đạt</th><th class="n">Vượt</th><th class="n">Không HT</th><th class="n">Không đảm bảo tiến độ</th><th class="n">Phát sinh</th><th>OKR (hệ số)</th><th class="n">Điểm KPI</th><th class="n">Điểm OKR</th><th class="n">Tổng</th><th>Xếp loại</th></tr></thead><tbody>
+    <section class="panel"><div class="toolbar"><h3 class="h3">Tổng điểm và xếp loại</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Tổ</th><th class="n">Đạt</th><th class="n">Vượt</th><th class="n">Không HT</th><th class="n">Không đảm bảo tiến độ</th><th class="n">Phát sinh</th><th>OKR (hệ số)</th><th class="n">Điểm phẩm chất</th><th class="n">Điểm KPI</th><th class="n">Điểm OKR</th><th class="n">Tổng</th><th>Xếp loại</th></tr></thead><tbody>
       ${ppl.map(x=>{const c=calc(x.id,p),f=finalRating(x.id,p);
-        return `<tr><td>${esc(x.name)}</td><td>${esc(x.to)}</td><td class="n">${c.dat}</td><td class="n">${c.vuot}</td><td class="n ${c.miss?'neg':''}">${c.miss}</td><td class="n ${c.cham?'neg':''}">${c.cham}</td><td class="n">${c.ps}</td><td>${c.coefs.length?c.coefs.map(num).join(' · '):'0'}</td><td class="n">${num(c.kpi)}</td><td class="n">${num(c.okr)}</td><td class="n"><b>${num(c.total)}</b></td><td><span class="chip c-${f}">${RT[f]}</span></td></tr>`;}).join('')||'<tr><td colspan="12" class="empty">Không có dữ liệu.</td></tr>'}
+        return `<tr><td>${esc(x.name)}</td><td>${esc(x.to)}</td><td class="n">${c.dat}</td><td class="n">${c.vuot}</td><td class="n ${c.miss?'neg':''}">${c.miss}</td><td class="n ${c.cham?'neg':''}">${c.cham}</td><td class="n">${c.ps}</td><td>${c.coefs.length?c.coefs.map(num).join(' · '):'0'}</td><td class="n">${num(c.pc)}</td><td class="n">${num(c.kpi)}</td><td class="n">${num(c.okr)}</td><td class="n"><b>${num(c.all)}</b></td><td><span class="chip c-${f}">${RT[f]}</span></td></tr>`;}).join('')||'<tr><td colspan="13" class="empty">Không có dữ liệu.</td></tr>'}
     </tbody></table></div></section>
     <section class="panel"><div class="toolbar"><h3 class="h3">Chi tiết từng việc</h3></div><div class="tw"><table class="wide"><thead><tr><th>Cán bộ</th><th>Tổ</th><th>Loại</th><th>Nội dung</th><th>Kết quả</th><th>Ngày nhập</th><th>Ngày duyệt</th><th>Người duyệt</th><th class="n">Điểm</th></tr></thead><tbody>
       ${its.map(i=>{const v=itemPts(i);return `<tr><td>${esc(uObj(i.owner).name)}</td><td>${esc(uObj(i.owner).to)}</td><td>${i.type==='OKR'?'OKR':i.src==='ps'?'KPI phát sinh':'KPI'}<div class="sub">${SRC[i.src]}</div></td><td>${esc(i.text)}</td><td>${statusCell(i)}</td><td class="dt">${fmtD(i.created)}</td><td class="dt">${fmt(i.approvedAt)}</td><td>${esc(i.approvedBy||'—')}</td><td class="n ${v<0?'neg':''}">${v?signed(v):'—'}</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty">Chưa có việc nào được duyệt.</td></tr>'}
@@ -1288,10 +1291,10 @@ function bcView(){
       ${nxN===6?'<p class="formula" style="margin:0">Mục 7 chỉ dành cho cán bộ giữ chức vụ lãnh đạo, chỉ huy; báo cáo in ra sẽ ghi "Không."</p>':''}
     </section>
     <section class="panel"><div class="toolbar"><h3 class="h3">IV. Tự chấm điểm và đề nghị xếp loại</h3><div class="spacer"></div>${wtag('mục IV')}</div><div class="tw"><table><tbody>
-      <tr><td>Nhóm tiêu chí phẩm chất, đạo đức, lối sống, uy tín (tối đa 30)</td>${hand}</tr>
+      <tr><td>Nhóm tiêu chí phẩm chất, đạo đức, lối sống, uy tín (tối đa 30, mặc định đủ điểm)</td><td class="n"><b>${num(c.pc)}</b></td></tr>
       <tr><td>Điểm KPI (hệ thống tính)</td><td class="n"><b>${num(c.kpi)}</b></td></tr>
       <tr><td>Điểm OKR (hệ thống tính)</td><td class="n"><b>${num(c.okr)}</b></td></tr>
-      <tr><td>Tổng điểm (= phẩm chất + KPI + OKR, tự cộng khi in)</td>${hand}</tr>
+      <tr><td>Tổng điểm (= phẩm chất + KPI + OKR)</td><td class="n"><b>${num(c.all)}</b></td></tr>
       <tr><td>Tự xếp loại (đánh dấu X trong báo cáo)</td><td class="n"><span class="chip c-${f}">${RT[f]}</span></td></tr>
     </tbody></table></div></section>
     <section class="panel pad stack"><div class="row" style="align-items:center"><h3 class="h3">V. Nhận xét của lãnh đạo và chữ ký</h3><div class="spacer"></div><span class="htag">Để trống trên Word</span></div>
@@ -1309,7 +1312,7 @@ function reportData(uid,p){
     kpi:sortKpi(its.filter(i=>i.type==='KPI')).map((i,k)=>({tt:k+1,nhiem_vu:i.text+(i.src==='ps'?' (phát sinh)':''),chi_tieu:i.chiTieu||'',ket_qua:'',san_pham:'',
       chat_luong:i.status==='duyet'?(i.level==='vuot'?'Vượt yêu cầu':'Đạt yêu cầu'):i.status==='khongdat'?'Không đạt':'Chưa đánh giá',tien_do:i.status==='duyet'?(i.cham?'Không đảm bảo':'Đảm bảo'):i.status==='khongdat'?'Không hoàn thành':'Chưa hoàn thành'})),
     nx1:nx(0),nx2:nx(1),nx3:nx(2),nx4:nx(3),nx5:nx(4),nx6:nx(5),nx7:isLead(u)?nx(6):'Không.',
-    diem_pc:'',diem_kpi:num(c.kpi),diem_okr:num(c.okr),tong_diem:'',x1:f==='HTXS'?'☒':'☐',x2:f==='HTT'?'☒':'☐',x3:f==='HTNV'?'☒':'☐',x4:f==='KHT'?'☒':'☐',
+    diem_pc:num(c.pc),diem_kpi:num(c.kpi),diem_okr:num(c.okr),tong_diem:num(c.all),x1:f==='HTXS'?'☒':'☐',x2:f==='HTT'?'☒':'☐',x3:f==='HTNV'?'☒':'☐',x4:f==='KHT'?'☒':'☐',
     ky_truong:settings.kyTruong,ky_pho:settings.kyPho};
 }
 async function saveFile(filename,blob){
@@ -1455,16 +1458,23 @@ function pqView(){
 
 // ================= QTV: THƯ VIỆN =================
 function libView(){
-  const groups=[...new Set(library.map(t=>t.group))];
-  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo vị trí việc làm (Phụ lục 2). Dùng để chọn nhanh khi giao việc hoặc khi cán bộ tự đăng ký.</p></div>
+  const groups=[...new Set(library.map(t=>t.group))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const q=norm((S.libQ||'').trim()),ft=S.libT||'*',fg=groups.includes(S.libG)?S.libG:'*';
+  const list=library.filter(t=>(ft==='*'||t.type===ft)&&(fg==='*'||t.group===fg)&&(!q||norm(t.text+' '+t.group).includes(q)))
+    .sort((a,b)=>a.group.localeCompare(b.group,'vi')||a.type.localeCompare(b.type));
+  return `<div class="head"><h2>Thư viện đầu việc</h2><p>Đầu việc mẫu theo vị trí việc làm (Phụ lục 2 cho KPI, Phụ lục 3 cho OKR). Dùng để chọn nhanh khi giao việc hoặc khi cán bộ tự đăng ký: gõ vài chữ ở ô Nội dung là hiện gợi ý.</p></div>
     <form class="panel pad row" id="f-lib">
       <div class="field" style="flex:0 1 140px"><label for="lb-type">Loại</label><select id="lb-type"><option>KPI</option><option>OKR</option></select></div>
       <div class="field" style="flex:1 1 200px"><label for="lb-group">Vị trí việc làm / nhóm</label><input type="text" id="lb-group" list="lb-groups" required placeholder="vd: Cán bộ địa bàn"><datalist id="lb-groups">${groups.map(g=>`<option value="${esc(g)}">`).join('')}</datalist></div>
       <div class="field" style="flex:3 1 320px"><label for="lb-text">Nội dung đầu việc</label><input type="text" id="lb-text" required></div>
       <button class="btn pri" type="submit">Thêm</button>
     </form>
-    <section class="panel"><div class="tw"><table><thead><tr><th>Loại</th><th>Vị trí việc làm / nhóm</th><th>Nội dung</th><th class="n">Thao tác</th></tr></thead><tbody>
-      ${library.slice().sort((a,b)=>a.group.localeCompare(b.group)).map(t=>`<tr><td><span class="chip ${t.type==='OKR'?'c-okr':'c-dk'}">${t.type}</span></td><td>${esc(t.group)}</td><td>${esc(t.text)}</td><td><div class="acts"><button class="btn sm ghost" data-act="lib-del" data-id="${t.id}">Xóa</button></div></td></tr>`).join('')}
+    <section class="panel"><div class="toolbar"><h3 class="h3">${list.length===library.length?`${library.length} đầu việc`:`${list.length} / ${library.length} đầu việc`}</h3><div class="spacer"></div>
+        <select id="lib-t" aria-label="Lọc loại"><option value="*">KPI và OKR</option><option ${ft==='KPI'?'selected':''}>KPI</option><option ${ft==='OKR'?'selected':''}>OKR</option></select>
+        <select id="lib-g" aria-label="Lọc nhóm"><option value="*">Tất cả nhóm</option>${groups.map(g=>`<option ${fg===g?'selected':''}>${esc(g)}</option>`).join('')}</select>
+        <input type="search" class="search" id="lib-q" placeholder="Tìm đầu việc…" value="${esc(S.libQ||'')}" aria-label="Tìm đầu việc"></div>
+      <div class="tw"><table><thead><tr><th>Loại</th><th>Vị trí việc làm / nhóm</th><th>Nội dung</th><th class="n">Thao tác</th></tr></thead><tbody>
+      ${list.map(t=>`<tr><td><span class="chip ${t.type==='OKR'?'c-okr':'c-dk'}">${t.type}</span></td><td>${esc(t.group)}</td><td>${esc(t.text)}</td><td><div class="acts"><button class="btn sm ghost" data-act="lib-del" data-id="${t.id}">Xóa</button></div></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Không có đầu việc nào khớp.</td></tr>'}
     </tbody></table></div></section>`;
 }
 
@@ -1776,6 +1786,8 @@ document.addEventListener('change',e=>{
   if(t.id==='g-lib'&&t.value){S.giao.text=library.find(x=>x.id===t.value).text;render();return;}
   if(t.id==='g-period'){S.giao.period=t.value;return;}
   if(t.id==='g-repeat'){S.giao.repeat=t.checked;return;}
+  if(t.id==='lib-t'){S.libT=t.value;render();return;}
+  if(t.id==='lib-g'){S.libG=t.value;render();return;}
   if(t.id==='th-to'){S.thTo=t.value;render();return;}
   if(t.id==='rp-period'){S.rep.period=t.value;render();return;}
   if(t.id==='rp-to'){S.rep.to=t.value;S.rep.who='*';render();return;}
@@ -1812,6 +1824,7 @@ document.addEventListener('input',e=>{
   if(t.dataset.act==='plkk'){getPlan(S.user,S.period).kk=t.value;return;}
   if(t.dataset.act==='nx'){getRep(S.user,S.period).nx[Number(t.dataset.k)]=t.value;return;}
   if(t.id==='pq-ls'){S.pqLQ=t.value;clearTimeout(window._pqq);window._pqq=setTimeout(()=>{render();const el=$('#pq-ls');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},250);return;}
+  if(t.id==='lib-q'){S.libQ=t.value;clearTimeout(window._libq);window._libq=setTimeout(()=>{render();const el=$('#lib-q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},250);return;}
   if(t.id==='acc-q'){S.accQ=t.value;clearTimeout(window._accq);window._accq=setTimeout(()=>{render();const el=$('#acc-q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},250);return;}
   if(t.id==='td-q'){S.tdQ=t.value;clearTimeout(window._tdq);window._tdq=setTimeout(()=>{render();const el=$('#td-q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}},250);return;}
   if(t.id==='td-msg'){S.tdMsg=t.value;return;}
