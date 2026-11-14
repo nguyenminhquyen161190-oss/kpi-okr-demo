@@ -639,6 +639,14 @@ const SRC={giao:'Được giao',dk:'Tự đăng ký',ps:'Phát sinh'};
 const RT={HTXS:'Hoàn thành xuất sắc',HTT:'Hoàn thành tốt',HTNV:'Hoàn thành nhiệm vụ',KHT:'Không hoàn thành nhiệm vụ'};
 const LV={dat:'Đạt chỉ tiêu',vuot:'Vượt chỉ tiêu'};
 const roleOf=u=>u.isAdmin?'Quản trị viên':u.role==='ql'?'Quản lý':'Cán bộ';
+// Số hiệu: chỉ giữ chữ số. Tài khoản cũ chưa lưu số hiệu thì lấy phần số ở cuối tên đăng nhập.
+const shDigits=s=>String(s??'').replace(/\D/g,'');
+const shOf=u=>shDigits(u.soHieu)||(/\d{3,}$/.exec(u.id)||[''])[0];
+const fmtSH=s=>{const d=shDigits(s);return d.length===6?d.slice(0,3)+'-'+d.slice(3):d;};
+// Tên đăng nhập = tên + chữ đầu họ đệm + số hiệu, bỏ dấu. Ví dụ Nguyễn Văn An, 123-456 → annv123456
+const ghepId=(name,sh)=>{const w=norm(name).trim().split(/\s+/).filter(Boolean);return w.length?(w.at(-1)+w.slice(0,-1).map(x=>x[0]).join('')+shDigits(sh)).replace(/[^a-z0-9]/g,''):'';};
+// Chữ viết tắt của tổ: chữ cái đầu mỗi từ sau chữ "Tổ". Tổ Phòng, chống tội phạm → PCTP
+const toCode=t=>norm(t).replace(/^to\s+/,'').split(/[^a-z0-9]+/).filter(Boolean).map(x=>x[0]).join('').toUpperCase();
 const isApprover=u=>u.isAdmin||u.role==='ql';
 const canApproveOwner=(uid)=>me().isAdmin||uObj(uid).approvers.includes(S.user);
 function scope(){const u=me();if(u.isAdmin)return users.filter(x=>x.evaluated);return users.filter(x=>x.evaluated&&(x.id===u.id||x.approvers.includes(u.id)));}
@@ -693,7 +701,7 @@ function closeItem(){
     if(d.text||d.chiTieu||d.spDuKien){S.itemD[S.itemOpen]=d;toast('Đã lưu bản nháp.');}else delete S.itemD[S.itemOpen];}
   S.itemOpen=null;S.editing=null;}
 function closeUser(){
-  if(S.addUser&&$('#f-user')){const d={id:$('#nu-id').value.trim(),name:$('#nu-name').value.trim(),capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
+  if(S.addUser&&$('#f-user')){const d={id:$('#nu-id').value.trim(),name:$('#nu-name').value.trim(),soHieu:shDigits($('#nu-sh').value),capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
     if(d.id||d.name||d.ngaySinh){S.userDraft=d;toast('Đã lưu bản nháp tài khoản.');}}
   S.addUser=false;S.editUser=null;}
 function periodPicker(){const y=S.period.slice(0,4),years=[...new Set(periods.map(p=>p.id.slice(0,4)))];
@@ -1517,12 +1525,14 @@ const accList=()=>{const q=norm((S.accQ||'').trim());
 function accounts(){
   const e=S.editUser&&uObj(S.editUser),f=e||(S.addUser&&S.userDraft);
   const apOpts=users.filter(u=>u.evaluated).map(u=>`<label><input type="checkbox" name="ap" value="${u.id}" ${e&&e.approvers.includes(u.id)?'checked':''}> ${esc(u.name)} <span class="sub" style="display:inline">${esc(u.cv)}</span></label>`).join('');
-  return `<div class="head row" style="align-items:flex-end;justify-content:space-between;gap:12px"><div><h2>Tài khoản</h2><p>${users.length} tài khoản. Mật khẩu mới và mật khẩu đặt lại đều là <b>${DEFAULT_PW}</b>. Tên đăng nhập: tên + chữ đầu họ đệm + số hiệu, ví dụ <b>hoavt007</b>.</p></div><button class="btn pri" data-act="add-user">+ Thêm tài khoản${S.userDraft?' (có bản nháp)':''}</button></div>
+  return `<div class="head row" style="align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2>Tài khoản</h2><p>${users.length} tài khoản. Mật khẩu mới và mật khẩu đặt lại đều là <b>${DEFAULT_PW}</b>. Tên đăng nhập: tên + chữ đầu họ đệm + số hiệu, ví dụ <b>hoavt007</b>.</p></div><div class="row" style="flex:0 1 auto;gap:8px;flex-wrap:wrap"><button class="btn" data-act="tk-mau">Xuất file mẫu</button><button class="btn" data-act="tk-nhap">Nhập từ Excel</button><input type="file" id="tk-file" accept=".xlsx" hidden><button class="btn pri" data-act="add-user">+ Thêm tài khoản${S.userDraft?' (có bản nháp)':''}</button></div></div>
+    ${S.imp?tkImpView():''}
     ${S.addUser||e?`<div class="ov" data-act="user-close-ov"><form class="modal md panel pad stack" id="f-user" role="dialog" aria-modal="true" aria-labelledby="nu-h">
       <div class="mhead"><h3 class="h3" id="nu-h">${e?'Sửa tài khoản':'Thêm tài khoản'}${!e&&S.userDraft?'<span class="chip c-cho" style="margin-left:6px">Bản nháp</span>':''}</h3><button class="btn ghost sm" type="button" data-act="edit-user-cancel" aria-label="Đóng">✕</button></div>
       <div class="fgrid">
         <div class="field"><label for="nu-id">Tên đăng nhập</label><input type="text" id="nu-id" required value="${f?esc(f.id):''}" ${e?'disabled':''} placeholder="Ví dụ: hoavt007" autocomplete="off"></div>
         <div class="field"><label for="nu-name">Họ tên</label><input type="text" id="nu-name" required value="${f?esc(f.name):''}" placeholder="Ví dụ: Vương Hoàng Việt"></div>
+        <div class="field"><label for="nu-sh">Số hiệu</label><input type="text" id="nu-sh" inputmode="numeric" autocomplete="off" placeholder="Ví dụ: 123-456" value="${f?esc(fmtSH(e?shOf(f):f.soHieu)):''}"></div>
         <div class="field"><label for="nu-cb">Cấp bậc</label><select id="nu-cb">${CAP_BAC.map(t=>`<option ${f&&f.capBac===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="field"><label for="nu-ns">Ngày sinh</label><input type="date" id="nu-ns" value="${f?esc(f.ngaySinh||''):''}"></div>
         <div class="field"><label for="nu-toct">Tổ</label><input type="text" id="nu-toct" list="nu-toct-list" autocomplete="off" placeholder="Ví dụ: Tổ An ninh" value="${f?esc(f.toCT||''):''}"><datalist id="nu-toct-list">${toList().map(t=>`<option value="${esc(t)}">`).join('')}</datalist></div>
@@ -1542,12 +1552,130 @@ function accounts(){
       </div>
       <div class="tw"><table class="wide"><thead><tr><th>Tên đăng nhập</th><th>Họ tên</th><th>Cấp bậc · Ngày sinh</th><th>Tổ</th><th>Nhóm · Chức vụ</th><th>Vai trò</th><th>Người duyệt</th><th>Trạng thái</th><th class="n">Thao tác</th></tr></thead><tbody>
     ${accList().length?'':'<tr><td colspan="8" class="empty">Không tìm thấy tài khoản nào.</td></tr>'}
-    ${accList().map(x=>`<tr><td><b>${esc(x.id)}</b>${x.isAdmin?'<div class="sub">Quản trị viên</div>':''}</td><td>${esc(x.name)}</td><td>${esc(x.capBac||'—')}<div class="sub">${x.ngaySinh?fmt(x.ngaySinh):'—'}</div></td><td>${esc(x.toCT||'')||'<span class="sub">Chưa chọn</span>'}</td><td>${esc(x.to)}<div class="sub">${esc(x.cv)}</div></td><td>${roleOf(x)}</td>
+    ${accList().map(x=>`<tr><td><b>${esc(x.id)}</b>${shOf(x)?`<div class="sub">Số hiệu ${esc(fmtSH(shOf(x)))}</div>`:''}${x.isAdmin?'<div class="sub">Quản trị viên</div>':''}</td><td>${esc(x.name)}</td><td>${esc(x.capBac||'—')}<div class="sub">${x.ngaySinh?fmt(x.ngaySinh):'—'}</div></td><td>${esc(x.toCT||'')||'<span class="sub">Chưa chọn</span>'}</td><td>${esc(x.to)}<div class="sub">${esc(x.cv)}</div></td><td>${roleOf(x)}</td>
       <td>${x.approvers.length?x.approvers.map(a=>a===x.id?'Tự duyệt':esc(uObj(a)?.name||a)).join('<br>'):'<span class="neg">Chưa có</span>'}</td>
       <td>${x.active?'<span class="chip c-duyet">Đang dùng</span>':'<span class="chip c-lock">Đã khóa</span>'}</td>
       <td><div class="acts"><button class="btn sm" data-act="edit-user" data-u="${x.id}">Sửa</button><button class="btn sm" data-act="reset" data-u="${x.id}">Đặt lại MK</button>${x.id===S.user?'':`<button class="btn sm ${x.active?'bad':''}" data-act="toggle-user" data-u="${x.id}">${x.active?'Khóa':'Mở khóa'}</button>`}</div></td></tr>`).join('')}
     </tbody></table></div></section>`;
 }
+
+// ================= QTV: THÊM TÀI KHOẢN HÀNG LOẠT BẰNG EXCEL =================
+// File mẫu: trang "Tài khoản" (dòng 1 tên cột, dòng 2 ví dụ, nhập từ dòng 3) + trang ẩn "Danh_muc" cho các ô chọn.
+const TK_COLS=['Họ tên','Số hiệu','Cấp bậc','Ngày sinh','Tổ','Nhóm','Chức vụ','Vai trò','Người duyệt','Trạng thái'];
+const TK_EX={name:'Nguyễn Văn An',sh:'123456'};
+// Mỗi tổ một mã viết tắt; hai tổ trùng mã thì tổ sau dùng tên đầy đủ
+function tkTos(){const seen={};return toList().map(t=>{let c=toCode(t);if(!c||seen[c])c=t;seen[c]=1;return {c,t};});}
+function tkMauBlob(){
+  const X=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),col=i=>String.fromCharCode(65+i);
+  const H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',NS='http://schemas.openxmlformats.org',R=NS+'/officeDocument/2006/relationships';
+  const cell=(ci,ri,v,s)=>`<c r="${col(ci)}${ri}" t="inlineStr"${s?` s="${s}"`:''}><is><t xml:space="preserve">${X(v)}</t></is></c>`;
+  const tos=tkTos(),LISTS=[CAP_BAC,tos.map(x=>x.c),settings.tos,settings.cvs,['Cán bộ','Quản lý'],['Đang dùng','Đã khóa'],tos.map(x=>x.t)];
+  const LIST_OF={2:0,4:1,5:2,6:3,7:4,9:5},LAST=301,W=[24,11,12,12,9,20,14,11,22,12];
+  const ex=[TK_EX.name,TK_EX.sh,'Thiếu úy','12/05/1995',tos[0]?.c||'',settings.tos[0]||'',settings.cvs.includes('Cán bộ')?'Cán bộ':(settings.cvs[0]||''),'Cán bộ','','Đang dùng'];
+  let rows=`<row r="1" ht="22" customHeight="1">${TK_COLS.map((h,i)=>cell(i,1,h,1)).join('')}</row><row r="2">${ex.map((v,i)=>cell(i,2,v,3)).join('')}</row>`;
+  for(let r=3;r<=LAST;r++)rows+=`<row r="${r}">${TK_COLS.map((h,i)=>`<c r="${col(i)}${r}" s="2"/>`).join('')}</row>`;
+  const tip=(c,t,m)=>`<dataValidation allowBlank="1" showInputMessage="1" promptTitle="${X(t)}" prompt="${X(m)}" sqref="${c}2:${c}${LAST}"/>`;
+  const dv=Object.entries(LIST_OF).filter(([,l])=>LISTS[l].length).map(([ci,l])=>{const c=col(+ci);
+    const p=+ci===4?` showInputMessage="1" promptTitle="Tổ" prompt="${X(tos.filter(x=>x.c!==x.t).map(x=>x.c+': '+x.t.replace(/^Tổ\s+/i,'')).join('. ').slice(0,250))}"`:'';
+    return `<dataValidation type="list" allowBlank="1" showErrorMessage="1"${p} errorTitle="Không có trong danh sách" error="Bấm mũi tên ở ô và chọn một giá trị có sẵn." sqref="${c}2:${c}${LAST}"><formula1>Danh_muc!$${col(l)}$1:$${col(l)}$${LISTS[l].length}</formula1></dataValidation>`;});
+  dv.push(tip('B','Số hiệu','Gõ 123456 hay 123-456 đều được. Chưa cấp thì để trống. Web tự ghép tên đăng nhập = tên + chữ đầu họ đệm + số hiệu.'));
+  dv.push(tip('D','Ngày sinh','Gõ ngày/tháng/năm, ví dụ 12/05/1995.'));
+  dv.push(tip('I','Người duyệt','Gõ số hiệu của người duyệt. Nhiều người thì cách nhau dấu phẩy.'));
+  const sh1=`${H}<worksheet xmlns="${NS}/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" tabSelected="1"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A3" sqref="A3"/></sheetView></sheetViews><cols>${W.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows}</sheetData><dataValidations count="${dv.length}">${dv.join('')}</dataValidations><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/></worksheet>`;
+  let r2='';for(let r=0;r<Math.max(...LISTS.map(l=>l.length));r++)r2+=`<row r="${r+1}">${LISTS.map((l,i)=>l[r]==null?'':cell(i,r+1,l[r],0)).join('')}</row>`;
+  const sh2=`${H}<worksheet xmlns="${NS}/spreadsheetml/2006/main"><sheetData>${r2}</sheetData></worksheet>`;
+  const z=new window.PizZip(),shs=[sh1,sh2];
+  z.file('[Content_Types].xml',`${H}<Types xmlns="${NS}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${shs.map((s,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`);
+  z.file('_rels/.rels',`${H}<Relationships xmlns="${NS}/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  z.file('xl/workbook.xml',`${H}<workbook xmlns="${NS}/spreadsheetml/2006/main" xmlns:r="${R}"><sheets><sheet name="Tài khoản" sheetId="1" r:id="rId1"/><sheet name="Danh_muc" sheetId="2" state="hidden" r:id="rId2"/></sheets></workbook>`);
+  z.file('xl/_rels/workbook.xml.rels',`${H}<Relationships xmlns="${NS}/package/2006/relationships">${shs.map((s,i)=>`<Relationship Id="rId${i+1}" Type="${R}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId3" Type="${R}/styles" Target="styles.xml"/></Relationships>`);
+  z.file('xl/styles.xml',`${H}<styleSheet xmlns="${NS}/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font><font><i/><sz val="11"/><color rgb="FF808080"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEEC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFD9D9D9"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="1" applyNumberFormat="1" applyBorder="1"/><xf numFmtId="49" fontId="2" fillId="0" borderId="1" applyNumberFormat="1" applyFont="1" applyBorder="1"/></cellXfs></styleSheet>`);
+  shs.forEach((s,i)=>z.file(`xl/worksheets/sheet${i+1}.xml`,s));
+  return z.generate({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+
+// Đọc trang đầu tiên của file .xlsx thành mảng dòng (rows[số dòng][số cột], tính từ 1 và 0)
+function readXlsx(buf){
+  const z=new window.PizZip(buf),P=new DOMParser(),RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const xml=n=>{const f=z.file(n);return f?P.parseFromString(f.asText(),'application/xml'):null;},T=(el,n)=>[...el.getElementsByTagNameNS('*',n)];
+  const wb=xml('xl/workbook.xml'),rels=xml('xl/_rels/workbook.xml.rels');if(!wb||!rels)throw new Error('không phải file Excel .xlsx');
+  const sh=T(wb,'sheet')[0];if(!sh)throw new Error('file không có trang tính nào');
+  const rid=sh.getAttributeNS(RNS,'id')||sh.getAttribute('r:id'),rel=T(rels,'Relationship').find(r=>r.getAttribute('Id')===rid);
+  let tg=rel?rel.getAttribute('Target'):'worksheets/sheet1.xml';tg=tg.startsWith('/')?tg.slice(1):'xl/'+tg.replace(/^\.\//,'');
+  const ss=xml('xl/sharedStrings.xml'),sst=ss?T(ss,'si').map(si=>T(si,'t').map(t=>t.textContent).join('')):[];
+  const doc=xml(tg);if(!doc)throw new Error('không tìm thấy trang tính');
+  const colIdx=ref=>{const m=/^[A-Z]+/.exec(ref||'');if(!m)return -1;let n=0;for(const ch of m[0])n=n*26+ch.charCodeAt(0)-64;return n-1;};
+  const rows=[];T(doc,'row').forEach((r,k)=>{const ri=Number(r.getAttribute('r'))||k+1,arr=[];let next=0;
+    T(r,'c').forEach(c=>{let ci=colIdx(c.getAttribute('r'));if(ci<0)ci=next;next=ci+1;const t=c.getAttribute('t');let v;
+      if(t==='inlineStr')v=T(c,'t').map(e=>e.textContent).join('');
+      else{const ve=T(c,'v')[0];if(!ve)return;v=ve.textContent;if(t==='s')v=sst[Number(v)]??'';else if(t==='b')v=v==='1'?'Có':'Không';else if(t!=='str'&&t!=='e')v=Number(v);}
+      arr[ci]=v;});rows[ri]=arr;});
+  return rows;}
+
+// Kiểm tra từng dòng: dòng hợp lệ được thêm, dòng lỗi bị bỏ qua (ghi rõ lỗi)
+function tkCheck(rows,file){
+  const hr=rows.findIndex(r=>r&&r.some(v=>norm(String(v??'')).trim()==='ho ten'));
+  if(hr<0)return {file,err:'Không thấy dòng tên cột (có ô "Họ tên"). Hãy dùng file tải từ nút "Xuất file mẫu".',rows:[]};
+  const ci={};rows[hr].forEach((v,i)=>{const k=norm(String(v??'')).replace(/\s+/g,' ').trim();if(k)ci[k]=i;});
+  const g=(r,h)=>{const v=r[ci[norm(h)]];return v==null?'':typeof v==='number'?v:String(v).replace(/\s+/g,' ').trim();};
+  const pick=(list,v)=>list.find(x=>norm(x)===norm(v));
+  const toMap={};tkTos().forEach(x=>{toMap[norm(x.c)]=x.t;toMap[norm(x.t)]=x.t;toMap[norm(x.t.replace(/^Tổ\s+/i,''))]=x.t;});
+  const ns=v=>{if(v==='')return '';
+    if(typeof v==='number'){if(v<1||v>80000)return null;const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);return d.toISOString().slice(0,10);}
+    let m=/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/.exec(v),y,mo,da;if(m){da=+m[1];mo=+m[2];y=+m[3];}
+    else if((m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v))){y=+m[1];mo=+m[2];da=+m[3];}else return null;
+    const d=new Date(Date.UTC(y,mo-1,da));return d.getUTCFullYear()===y&&d.getUTCMonth()===mo-1&&d.getUTCDate()===da&&y>1900?d.toISOString().slice(0,10):null;};
+  const out=[];
+  rows.forEach((r,ri)=>{if(ri<=hr||!r)return;
+    const name=String(g(r,'Họ tên')),shRaw=String(g(r,'Số hiệu'));
+    if(!r.some(v=>String(v??'').trim()))return;                                       // dòng trống
+    if(name===TK_EX.name&&shDigits(shRaw)===TK_EX.sh)return;                          // dòng ví dụ
+    const e=[],sh=shDigits(shRaw),x={r:ri,name,sh,errs:e,note:[]};
+    if(!name)e.push('Thiếu họ tên');
+    if(shRaw&&!/^[\d\s.\-]+$/.test(shRaw))e.push('Số hiệu chỉ gồm chữ số');
+    x.id=ghepId(name,sh);
+    if(x.id){const old=uObj(x.id);if(old)e.push(`Đã có tài khoản ${x.id} (${old.name})`);}
+    if(sh){const o=users.find(u=>shOf(u)===sh);if(o&&o.id!==x.id)e.push(`Số hiệu đã có: ${o.name}`);}
+    const cb=g(r,'Cấp bậc'),capBac=cb===''?'':pick(CAP_BAC,cb);if(capBac==null)e.push(`Cấp bậc "${cb}" không đúng`);
+    const nsv=String(g(r,'Ngày sinh'))===''?'':ns(g(r,'Ngày sinh'));if(nsv==null)e.push(`Ngày sinh "${g(r,'Ngày sinh')}" không đúng (gõ ngày/tháng/năm)`);
+    const tv=String(g(r,'Tổ')),toCT=tv===''?'':toMap[norm(tv)];if(toCT==null)e.push(`Không có tổ "${tv}"`);
+    const nv=String(g(r,'Nhóm')),to=pick(settings.tos,nv);if(!nv)e.push('Thiếu nhóm');else if(!to)e.push(`Không có nhóm "${nv}"`);
+    const cvv=String(g(r,'Chức vụ')),cv=cvv===''?(pick(settings.cvs,'Cán bộ')||settings.cvs[0]||'Cán bộ'):pick(settings.cvs,cvv);if(!cv)e.push(`Không có chức vụ "${cvv}"`);
+    const rv=norm(String(g(r,'Vai trò'))),role=!rv||rv==='can bo'?'cb':rv==='quan ly'?'ql':null;if(!role)e.push('Vai trò chỉ được "Cán bộ" hoặc "Quản lý"');
+    const sv=norm(String(g(r,'Trạng thái'))),active=!sv||sv==='dang dung'?true:sv==='da khoa'?false:null;if(active==null)e.push('Trạng thái chỉ được "Đang dùng" hoặc "Đã khóa"');
+    x.apRaw=String(g(r,'Người duyệt')).split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+    x.data={name,soHieu:sh,capBac:capBac||'',ngaySinh:nsv||'',toCT:toCT||'',to:to||'',cv:cv||'',role:role||'cb',isAdmin:false,evaluated:true};x.active=active!==false;
+    out.push(x);});
+  // Trùng nhau trong file
+  const cnt={},cntSh={};out.forEach(x=>{if(x.id)cnt[x.id]=(cnt[x.id]||0)+1;if(x.sh)cntSh[x.sh]=(cntSh[x.sh]||0)+1;});
+  out.forEach(x=>{if(x.id&&cnt[x.id]>1)x.errs.push(`Trùng tên đăng nhập ${x.id} với dòng khác trong file`);else if(x.sh&&cntSh[x.sh]>1)x.errs.push('Trùng số hiệu với dòng khác trong file');});
+  // Người duyệt: tìm theo số hiệu (hoặc tên đăng nhập) trong tài khoản đã có và trong file
+  const okNew=out.filter(x=>!x.errs.length);
+  out.forEach(x=>{x.ap=[];x.apName=[];x.apRaw.forEach(tok=>{const d=shDigits(tok),lo=tok.toLowerCase();
+    const u=users.find(u=>(d&&shOf(u)===d)||u.id===lo),n=!u&&okNew.find(y=>(d&&y.sh===d)||y.id===lo);
+    if(!u&&!n){const b=out.find(y=>(d&&y.sh===d)||y.id===lo);x.errs.push(b?`Người duyệt "${tok}" ở dòng ${b.r} đang lỗi`:`Không tìm thấy người duyệt "${tok}"`);return;}
+    const id=u?u.id:n.id;if(x.ap.includes(id))return;x.ap.push(id);x.apName.push(u?u.name:n.name);
+    if(u&&!isApprover(u))x.note.push(`${u.name} sẽ thành Quản lý`);});});
+  return {file,rows:out};}
+
+function tkImpView(){const m=S.imp,ok=m.rows.filter(x=>!x.errs.length),bad=m.rows.length-ok.length;
+  return `<div class="ov" data-act="imp-close-ov"><div class="modal md panel pad stack" style="max-width:1000px" role="dialog" aria-modal="true" aria-labelledby="imp-h">
+    <div class="mhead"><h3 class="h3" id="imp-h">Nhập tài khoản từ Excel</h3><button class="btn ghost sm" type="button" data-act="imp-close" aria-label="Đóng">✕</button></div>
+    ${m.err?`<p class="neg" style="margin:0">${esc(m.err)}</p>`:!m.rows.length?'<p style="margin:0">File không có dòng nào để nhập. Hãy điền từ dòng 3 trở xuống.</p>':`
+    <p style="margin:0">File <b>${esc(m.file)}</b>: <b>${ok.length}</b> dòng hợp lệ${bad?`, <b class="neg">${bad}</b> dòng lỗi sẽ bị bỏ qua`:''}. Chưa có gì được lưu cho tới khi bấm nút thêm.</p>
+    <div class="tw"><table class="wide"><thead><tr><th>Dòng</th><th>Họ tên</th><th>Tên đăng nhập</th><th>Tổ · Nhóm</th><th>Chức vụ · Vai trò</th><th>Người duyệt</th><th>Kết quả</th></tr></thead><tbody>
+    ${m.rows.map(x=>`<tr><td>${x.r}</td><td><b>${esc(x.name||'—')}</b><div class="sub">${x.sh?'Số hiệu '+esc(fmtSH(x.sh)):'Chưa có số hiệu'}</div></td><td>${esc(x.id||'—')}</td>
+      <td>${esc(x.data.toCT||'—')}<div class="sub">${esc(x.data.to||'—')}</div></td><td>${esc(x.data.cv)}<div class="sub">${x.data.role==='ql'?'Quản lý':'Cán bộ'}${x.active?'':' · Đã khóa'}</div></td>
+      <td>${x.apName.length?x.apName.map(esc).join('<br>'):'<span class="sub">Chưa có</span>'}</td>
+      <td>${x.errs.length?x.errs.map(t=>`<div class="neg">${esc(t)}</div>`).join(''):`<span class="chip c-duyet">Hợp lệ</span>${x.note.map(t=>`<div class="sub">${esc(t)}</div>`).join('')}`}</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="formula" style="margin:0">Mật khẩu ban đầu của tài khoản mới: <b>${esc(DEFAULT_PW)}</b>. Tài khoản đã có không bị sửa hay xóa${m.rows.some(x=>!x.errs.length&&x.note.length)?', trừ người được ghi "sẽ thành Quản lý"':''}.</p>`}
+    <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" type="button" data-act="imp-close">Hủy</button>${ok.length?`<button class="btn pri" type="button" data-act="imp-ok">Thêm ${ok.length} tài khoản</button>`:''}</div>
+  </div></div>`;}
+
+function tkImpApply(){const ok=S.imp.rows.filter(x=>!x.errs.length);
+  ok.forEach(x=>{if(!uObj(x.id))users.push({id:x.id,active:x.active,approvers:[],...x.data});});
+  ok.forEach(x=>{const u=uObj(x.id);u.approvers=x.ap.filter(a=>uObj(a));u.approvers.forEach(a=>{const m=uObj(a);if(m&&!m.isAdmin&&m.role!=='ql')m.role='ql';});});
+  S.imp=null;toast(`Đã thêm ${ok.length} tài khoản, mật khẩu ban đầu ${DEFAULT_PW}.`);}
 
 // ================= QTV: CÀI ĐẶT =================
 function settingsView(){
@@ -1744,6 +1872,11 @@ document.addEventListener('click',e=>{
     case 'dl-close-ov':if(e.target!==b)return;S.dlSeen[curP()]=true;break;
     case 'dl-go':S.dlSeen[curP()]=true;Object.assign(S,{view:b.dataset.v,period:curP(),menu:false,itemOpen:b.dataset.v,itemWas:!!S.itemD[b.dataset.v]});render();setTimeout(()=>$('#it-text')?.focus());return;
     case 'add-user':S.addUser=true;S.editUser=null;break;
+    case 'tk-mau':if(!window.PizZip){toast('Chưa tải được thư viện tạo file. Kiểm tra mạng rồi thử lại.');break;}saveFile('MAU_NHAP_TAI_KHOAN.xlsx',tkMauBlob());return;
+    case 'tk-nhap':{const el=$('#tk-file');if(el){el.value='';el.click();}return;}
+    case 'imp-close':S.imp=null;break;
+    case 'imp-close-ov':if(e.target!==b)return;S.imp=null;break;
+    case 'imp-ok':tkImpApply();break;
     case 'edit-user':S.editUser=b.dataset.u;S.addUser=false;break;
     case 'edit-user-cancel':closeUser();break;
     case 'user-close-ov':if(e.target!==b)return;closeUser();break;
@@ -1788,6 +1921,9 @@ document.addEventListener('change',e=>{
   if(t.id==='td-f'){S.tdF=t.value;render();return;}
   if(t.id==='td-to'){S.tdTo=t.value;render();return;}
   if(t.id==='acc-to'){S.accTo=t.value;render();return;}
+  if(t.id==='tk-file'){const f=t.files&&t.files[0];if(!f)return;
+    if(!window.PizZip){toast('Chưa tải được thư viện đọc file. Kiểm tra mạng rồi thử lại.');render();return;}
+    f.arrayBuffer().then(buf=>{S.imp=tkCheck(readXlsx(buf),f.name);}).catch(err=>{S.imp={file:f.name,err:'Không đọc được file này. Hãy dùng file .xlsx tải từ nút "Xuất file mẫu". ('+(err.message||err)+')',rows:[]};}).then(render);return;}
   if(a==='rate'){const k=S.period+'|'+t.dataset.u;if(!t.value){delete ratings[k];toast(`Đã bỏ xếp loại ${uObj(t.dataset.u).name}.`);}else{ratings[k]=t.value;toast(`Đã xếp loại ${uObj(t.dataset.u).name}: ${RT[t.value]}.`);}render();return;}
   if(t.id==='period'){S.period=t.value;S.sel.clear();S.editing=null;render();return;}
   if(t.id==='pyear'){const ps=periods.filter(p=>p.id.startsWith(t.value)),cur=ps.find(p=>p.id.slice(5)===S.period.slice(5));S.period=(cur||ps.at(-1)).id;S.sel.clear();S.editing=null;render();return;}
@@ -1828,6 +1964,8 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id&&t.id.startsWith('pr-')&&$('#pv-dv')){const g=k=>$('#pr-'+k).value.trim();$('#pv-dv').textContent=g('tenDonVi').toUpperCase();$('#pv-dd').textContent=$('#pv-dd').textContent.replace(/^.*?, ngày/,g('diaDanh')+', ngày');$('#pv-tp').textContent=g('tenDonVi')+', '+g('tinhTP');}
   if(t.dataset.act==='coef'){S.coef[t.dataset.id]=t.value;updatePts(t.dataset.id);return;}
+  // Thêm tài khoản: tự ghép tên đăng nhập từ họ tên + số hiệu, trừ khi QTV đã tự gõ tên đăng nhập
+  if((t.id==='nu-name'||t.id==='nu-sh')&&S.addUser){const el=$('#nu-id');if(el&&(!el.value||el.value===el.dataset.auto)){el.value=el.dataset.auto=ghepId($('#nu-name').value,$('#nu-sh').value);}return;}
   if(t.dataset.sug)showSug(t);
   if(t.id==='g-text'){S.giao.text=t.value;return;}
   if(t.id==='g-ct'){S.giao.chiTieu=t.value;return;}
@@ -1878,7 +2016,7 @@ document.addEventListener('submit',e=>{
   if(f.id==='f-print'){['tenDonVi','tinhTP','diaDanh','kyTruong','kyPho'].forEach(k=>settings[k]=$('#pr-'+k).value.trim());toast('Đã lưu thông tin in báo cáo.');}
   if(f.id==='f-lib'){library.push({id:newId('t'),type:$('#lb-type').value,group:$('#lb-group').value.trim(),text:$('#lb-text').value.trim()});toast('Đã thêm vào thư viện.');}
   if(f.id==='f-period'){const v=$('#np').value,n=openPeriod(v);toast(n<0?`${pLabel(v)} đã có.`:`Đã mở ${pLabel(v)}. Tự giao lại ${n} việc lặp hằng tháng.`);}
-  if(f.id==='f-user'){const data={name:$('#nu-name').value.trim(),toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
+  if(f.id==='f-user'){const data={name:$('#nu-name').value.trim(),soHieu:shDigits($('#nu-sh').value),toCT:$('#nu-toct').value.trim(),to:$('#nu-to').value,cv:$('#nu-cv').value,capBac:$('#nu-cb').value,ngaySinh:$('#nu-ns').value,role:$('#nu-role').value,isAdmin:/^a/.test($('#nu-extra').value),evaluated:!['an','x'].includes($('#nu-extra').value)};
     if(S.editUser&&data.role!=='ql')users.forEach(u=>u.approvers=u.approvers.filter(a=>a!==S.editUser));
     if(S.editUser){const x=uObj(S.editUser);Object.assign(x,data);if(x.isAdmin&&x.evaluated&&!x.approvers.length)x.approvers=[x.id];toast('Đã lưu tài khoản.');S.editUser=null;}
     else{const id=$('#nu-id').value.trim().toLowerCase();if(uObj(id)){toast('Tên đăng nhập đã tồn tại.');render();return;}
